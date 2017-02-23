@@ -6,11 +6,12 @@ public class NeuralNet extends SupervisedLearner
 {
     private Random rand;
     private int hiddenLayerSize;
-    private double learningRate = 0.1;
+    private double learningRate = 0.3;
     private boolean momentum;
-    private double momentumCoeff = 0.9;
+    private double momentumCoeff = 0.09;
     private TargetNode[] targetNodes;
     private HiddenNode[] hiddenNodes;
+    private Writer fileWriter;
 
     public NeuralNet(Random rand)
     {
@@ -27,10 +28,13 @@ public class NeuralNet extends SupervisedLearner
     @Override
     public void train(Matrix inputs, Matrix targets) throws Exception
     {
-        hiddenLayerSize = inputs.cols() * 2;
+//        hiddenLayerSize = inputs.cols() * 2;
         hiddenNodes = new HiddenNode[hiddenLayerSize];
         TargetNode[] bestTargetNodes = targetNodes;
         HiddenNode[] bestHiddenNodes = hiddenNodes;
+        double bestVSAccuracy = 0.0;
+        double bestTrainMSE = 0.0;
+        double bestVSMSE = 0.0;
 
         // if there are multiple output classes
         if (targets.valueCount(0) > 2)
@@ -60,14 +64,15 @@ public class NeuralNet extends SupervisedLearner
         Matrix validationTargets = new Matrix(targets, trainingSetSize, 0, inputs.rows() - trainingSetSize, 1);
 
         // save results of training to file
-        File outputFile = new File("results.csv");
-        if (outputFile.exists())
-        {
-            outputFile.delete();
-        }
-        outputFile.createNewFile();
-        Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
-        fileWriter.write("Epoch,Training MSE,VS MSE,VS Accuracy\n");
+//        File outputFile = new File("results.csv");
+//        if (outputFile.exists())
+//        {
+//            outputFile.delete();
+//        }
+//        outputFile.createNewFile();
+//        Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
+//        fileWriter.write("Learning Rate,VS MSE,Training MSE,Test MSE,VS Accuracy,Test Accuracy,Epoch\n");
+//        fileWriter.write("Epoch,Training MSE,VS MSE,VS Accuracy\n");
 
         // start learning
         boolean learning = true;
@@ -149,6 +154,9 @@ public class NeuralNet extends SupervisedLearner
                     bestValidationAccuracy = validationAccuracy;
                     bestHiddenNodes = hiddenNodes.clone();
                     bestTargetNodes = targetNodes.clone();
+                    bestVSAccuracy = validationAccuracy;
+                    bestTrainMSE = mseTrainSum / mseTrainCount;
+                    bestVSMSE = mseVS;
                 }
             }
             else if (validationAccuracy <= lastValidationAccuracy)
@@ -162,10 +170,15 @@ public class NeuralNet extends SupervisedLearner
             }
 
             // save to file the result of the epoch
-            fileWriter.write(epochCount + "," + mseTrainSum / mseTrainCount + "," + mseVS + "," + validationAccuracy + "\n");
+//            fileWriter.write(epochCount + "," + mseTrainSum / mseTrainCount + "," + mseVS + "," + validationAccuracy + "\n");
         }
-        fileWriter.close();
+//        fileWriter.close();
         System.out.println("Total epochs: " + bestFoundAtEpoch);
+        System.out.println("Training MSE: " + bestTrainMSE);
+        System.out.println("Validation MSE: " + bestVSMSE);
+        System.out.println("Validation Accuracy: " + bestValidationAccuracy);
+//        fileWriter.write(learningRate + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
+        fileWriter.write(hiddenLayerSize + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
         hiddenNodes = bestHiddenNodes;
         targetNodes = bestTargetNodes;
     }
@@ -234,6 +247,21 @@ public class NeuralNet extends SupervisedLearner
         }
 
         return meanSquaredSum / meanSquaredCount;
+    }
+
+    public void incrementLearningRate()
+    {
+        learningRate -= 0.01;
+    }
+
+    public void setFileWriter(Writer writer)
+    {
+        this.fileWriter = writer;
+    }
+
+    public void setHiddenLayerSize(int size)
+    {
+        hiddenLayerSize = size;
     }
 
     private abstract class Node

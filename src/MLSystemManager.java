@@ -4,9 +4,9 @@
 // ----------------------------------------------------------------
 
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Random;
-import java.io.File;
 
 
 public class MLSystemManager {
@@ -46,6 +46,9 @@ public class MLSystemManager {
 		// Load the ARFF file
 		Matrix data = new Matrix();
 		data.loadArff(fileName);
+
+		Matrix tempData = new Matrix(data, 0, 3, data.rows(), data.cols() - 3);
+		data = tempData;
 		if (normalize)
 		{
 			System.out.println("Using normalized data\n");
@@ -122,20 +125,46 @@ public class MLSystemManager {
 			Matrix trainLabels = new Matrix(data, 0, data.cols() - 1, trainSize, 1);
 			Matrix testFeatures = new Matrix(data, trainSize, 0, data.rows() - trainSize, data.cols() - 1);
 			Matrix testLabels = new Matrix(data, trainSize, data.cols() - 1, data.rows() - trainSize, 1);
-			double startTime = System.currentTimeMillis();
-			learner.train(trainFeatures, trainLabels);
-			double elapsedTime = System.currentTimeMillis() - startTime;
-			System.out.println("Time to train (in seconds): " + elapsedTime / 1000.0);
-			double trainAccuracy = learner.measureAccuracy(trainFeatures, trainLabels, null);
-			System.out.println("Training set accuracy: " + trainAccuracy);
-			Matrix confusion = new Matrix();
-			double testAccuracy = learner.measureAccuracy(testFeatures, testLabels, confusion);
-			System.out.println("Test set accuracy: " + testAccuracy);
-			if(printConfusionMatrix) {
-				System.out.println("\nConfusion matrix: (Row=target value, Col=predicted value)");
-				confusion.print();
-				System.out.println("\n");
+
+
+			File outputFile = new File("results.csv");
+			if (outputFile.exists())
+			{
+				outputFile.delete();
 			}
+			outputFile.createNewFile();
+			Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
+// 	        fileWriter.write("Learning Rate,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+ 	        fileWriter.write("# Hidden Nodes,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+			((NeuralNet)learner).setFileWriter(fileWriter);
+
+			int numberOfHiddenNodes = 1;
+			for (int i = 0; i < 10; i++)
+			{
+				((NeuralNet)learner).setHiddenLayerSize(numberOfHiddenNodes);
+				for (int j = 0; j < 10; j++)
+				{
+					double startTime = System.currentTimeMillis();
+					learner.train(trainFeatures, trainLabels);
+					double elapsedTime = System.currentTimeMillis() - startTime;
+					System.out.println("Time to train (in seconds): " + elapsedTime / 1000.0);
+					double trainAccuracy = learner.measureAccuracy(trainFeatures, trainLabels, null);
+					System.out.println("Training set accuracy: " + trainAccuracy);
+					Matrix confusion = new Matrix();
+					double testAccuracy = learner.measureAccuracy(testFeatures, testLabels, confusion);
+					System.out.println("Test set accuracy: " + testAccuracy);
+					fileWriter.write(testAccuracy + "," + Math.pow((1 - testAccuracy), 2) + "\n");
+					if (printConfusionMatrix)
+					{
+						System.out.println("\nConfusion matrix: (Row=target value, Col=predicted value)");
+						confusion.print();
+						System.out.println("\n");
+					}
+				}
+//				((NeuralNet)learner).incrementLearningRate();
+				numberOfHiddenNodes *= 2;
+			}
+			fileWriter.close();
 		}
 		else if (evalMethod.equals("cross"))
 		{
