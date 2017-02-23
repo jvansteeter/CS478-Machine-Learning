@@ -1,0 +1,24 @@
+Using normalized data,
+,
+,
+Dataset name: virginica.arff,
+Number of instances: 150,
+Number of attributes: 5,
+Learning algorithm: perceptron,
+Evaluation method: random,
+,
+Calculating accuracy on a random hold-out set...,
+Percentage used for training: 0.7,
+Percentage used for testing: 0.30000000000000004,
+,
+Number of epochs before haulting: 49,
+,
+Weight Values,
+sepallength,-0.053674779
+sepalwidth,0.24097026
+petallength,0.454511365
+petalwidth,-0.430126133
+,
+Time to train (in seconds): 0.013,
+Training set accuracy: 0.6761904761904762,
+Test set accuracy: 0.7333333333333333,

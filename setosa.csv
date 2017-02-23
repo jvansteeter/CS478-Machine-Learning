@@ -1,0 +1,24 @@
+Using normalized data,
+,
+,
+Dataset name: setosa.arff,
+Number of instances: 150,
+Number of attributes: 5,
+Learning algorithm: perceptron,
+Evaluation method: random,
+,
+Calculating accuracy on a random hold-out set...,
+Percentage used for training: 0.7,
+Percentage used for testing: 0.30000000000000004,
+,
+Number of epochs before haulting: 10,
+,
+Weight Values,
+sepallength,0.056196992
+sepalwidth,-0.325098511
+petallength,0.152127115
+petalwidth,0.049974044
+,
+Time to train (in seconds): 0.002,
+Training set accuracy: 0.9904761904761905,
+Test set accuracy: 1.0,

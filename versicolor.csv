@@ -1,0 +1,24 @@
+Using normalized data,
+,
+,
+Dataset name: versicolor.arff,
+Number of instances: 150,
+Number of attributes: 5,
+Learning algorithm: perceptron,
+Evaluation method: random,
+,
+Calculating accuracy on a random hold-out set...,
+Percentage used for training: 0.7,
+Percentage used for testing: 0.30000000000000004,
+,
+Number of epochs before haulting: 36,
+,
+Weight Values,
+sepallength,0.3166008
+sepalwidth,0.003061388
+petallength,-0.970516162
+petalwidth,0.511944524
+,
+Time to train (in seconds): 0.012,
+Training set accuracy: 0.6952380952380952,
+Test set accuracy: 0.6888888888888889,
