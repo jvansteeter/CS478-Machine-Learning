@@ -8,7 +8,7 @@ public class NeuralNet extends SupervisedLearner
     private int hiddenLayerSize;
     private double learningRate = 0.3;
     private boolean momentum;
-    private double momentumCoeff = 0.09;
+    private double momentumCoeff = 0.1;
     private TargetNode[] targetNodes;
     private HiddenNode[] hiddenNodes;
     private Writer fileWriter;
@@ -178,7 +178,8 @@ public class NeuralNet extends SupervisedLearner
         System.out.println("Validation MSE: " + bestVSMSE);
         System.out.println("Validation Accuracy: " + bestValidationAccuracy);
 //        fileWriter.write(learningRate + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
-        fileWriter.write(hiddenLayerSize + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
+//        fileWriter.write(hiddenLayerSize + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
+        fileWriter.write(momentumCoeff + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
         hiddenNodes = bestHiddenNodes;
         targetNodes = bestTargetNodes;
     }
@@ -252,6 +253,11 @@ public class NeuralNet extends SupervisedLearner
     public void incrementLearningRate()
     {
         learningRate -= 0.01;
+    }
+
+    public void incrementMomentum()
+    {
+        momentumCoeff += 0.1;
     }
 
     public void setFileWriter(Writer writer)

@@ -135,13 +135,14 @@ public class MLSystemManager {
 			outputFile.createNewFile();
 			Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
 // 	        fileWriter.write("Learning Rate,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
- 	        fileWriter.write("# Hidden Nodes,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+// 	        fileWriter.write("# Hidden Nodes,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+ 	        fileWriter.write("Momentum,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
 			((NeuralNet)learner).setFileWriter(fileWriter);
 
-			int numberOfHiddenNodes = 1;
+			int numberOfHiddenNodes = 64;
+			((NeuralNet)learner).setHiddenLayerSize(numberOfHiddenNodes);
 			for (int i = 0; i < 10; i++)
 			{
-				((NeuralNet)learner).setHiddenLayerSize(numberOfHiddenNodes);
 				for (int j = 0; j < 10; j++)
 				{
 					double startTime = System.currentTimeMillis();
@@ -161,8 +162,9 @@ public class MLSystemManager {
 						System.out.println("\n");
 					}
 				}
+				((NeuralNet)learner).incrementMomentum();
 //				((NeuralNet)learner).incrementLearningRate();
-				numberOfHiddenNodes *= 2;
+//				numberOfHiddenNodes *= 2;
 			}
 			fileWriter.close();
 		}
