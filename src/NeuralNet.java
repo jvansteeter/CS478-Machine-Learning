@@ -8,9 +8,11 @@ public class NeuralNet extends SupervisedLearner
     private int hiddenLayerSize;
     private double learningRate = 0.3;
     private boolean momentum;
-    private double momentumCoeff = 0.1;
+    private double momentumCoeff = 1.3;
+    private int layers = 1;
     private TargetNode[] targetNodes;
-    private HiddenNode[] hiddenNodes;
+//    private HiddenNode[] hiddenNodes;
+    private HiddenNode[][] hiddenLayers;
     private Writer fileWriter;
 
     public NeuralNet(Random rand)
@@ -29,9 +31,15 @@ public class NeuralNet extends SupervisedLearner
     public void train(Matrix inputs, Matrix targets) throws Exception
     {
 //        hiddenLayerSize = inputs.cols() * 2;
-        hiddenNodes = new HiddenNode[hiddenLayerSize];
+        hiddenLayers = new HiddenNode[layers][hiddenLayerSize];
+        for (int i = 0; i < layers; i++)
+        {
+            hiddenLayers[i] = new HiddenNode[hiddenLayerSize];
+        }
+//        hiddenNodes = new HiddenNode[hiddenLayerSize];
         TargetNode[] bestTargetNodes = targetNodes;
-        HiddenNode[] bestHiddenNodes = hiddenNodes;
+//        HiddenNode[] bestHiddenNodes = hiddenNodes;
+        HiddenNode[][] bestHiddenLayers = hiddenLayers;
         double bestVSAccuracy = 0.0;
         double bestTrainMSE = 0.0;
         double bestVSMSE = 0.0;
@@ -51,9 +59,20 @@ public class NeuralNet extends SupervisedLearner
             targetNodes = new TargetNode[1];
             targetNodes[0] = new TargetNode(hiddenLayerSize, 1);
         }
+//        for (int i = 0; i < hiddenLayerSize; i++)
+//        {
+//            hiddenNodes[i] = new HiddenNode(inputs.cols());
+//        }
         for (int i = 0; i < hiddenLayerSize; i++)
         {
-            hiddenNodes[i] = new HiddenNode(inputs.cols());
+            hiddenLayers[0][i] = new HiddenNode(inputs.cols());
+        }
+        for (int i = 1; i < layers; i++)
+        {
+            for (int j = 0; j < hiddenLayerSize; j++)
+            {
+                hiddenLayers[i][j] = new HiddenNode(hiddenLayerSize);
+            }
         }
 
         // separate input into training and validation sets
@@ -94,10 +113,22 @@ public class NeuralNet extends SupervisedLearner
                 double[] row = trainingFeatures.row(i);
                 double target = trainingTargets.row(i)[0];
                 // get the outputs from the hidden nodes by feeding them the input nodes
-                double[] hiddenOutputs = new double[hiddenNodes.length];
-                for (int j = 0; j < hiddenNodes.length; j++)
+//                double[] hiddenOutputs = new double[hiddenNodes.length];
+//                for (int j = 0; j < hiddenNodes.length; j++)
+//                {
+//                    hiddenOutputs[j] = hiddenNodes[j].output(row);
+//                }
+                double[][] hiddenOutputs = new double[layers][hiddenLayerSize];
+                for (int j = 0; j < hiddenLayerSize; j++)
                 {
-                    hiddenOutputs[j] = hiddenNodes[j].output(row);
+                    hiddenOutputs[0][j] = hiddenLayers[0][j].output(row);
+                }
+                for (int j = 1; j < layers; j++)
+                {
+                    for (int k = 0; k < hiddenLayerSize; k++)
+                    {
+                        hiddenOutputs[j][k] = hiddenLayers[j][k].output(hiddenOutputs[j - 1]);
+                    }
                 }
                 // get the outputs from the target nodes by feeding them the output form the hidden nodes
                 double[] targetOutputs = new double[targetNodes.length];
@@ -105,24 +136,67 @@ public class NeuralNet extends SupervisedLearner
                 for (int j = 0; j < targetNodes.length; j++)
                 {
                     // outputs
-                    targetOutputs[j] = targetNodes[j].output(hiddenOutputs);
+//                    targetOutputs[j] = targetNodes[j].output(hiddenOutputs);
+                    targetOutputs[j] = targetNodes[j].output(hiddenOutputs[hiddenOutputs.length - 1]);
                     // calculate the errors
                     targetErrors[j] = targetNodes[j].error(targetOutputs[j], target);
                     // calc mean squared error for training set
                     mseTrainSum += Math.pow(targetErrors[j], 2);
                     mseTrainCount++;
                     // update the weights for the target nodes
-                    targetNodes[j].updateWeight(targetErrors[j], hiddenOutputs);
+//                    targetNodes[j].updateWeight(targetErrors[j], hiddenOutputs);
+                    targetNodes[j].updateWeight(targetErrors[j], hiddenOutputs[hiddenOutputs.length - 1]);
                 }
                 // back propogate the weights through the hidden layer
-                for (int j = 0; j < hiddenNodes.length; j++)
+//                for (int j = 0; j < hiddenNodes.length; j++)
+//                {
+//                    double[] targetWeights = new double[targetNodes.length];
+//                    for (int k = 0; k < targetNodes.length; k++)
+//                    {
+//                        targetWeights[k] = targetNodes[k].getWeight(j);
+//                    }
+//                    hiddenNodes[j].updateWeight(targetErrors, targetWeights, hiddenOutputs[j], row);
+//                }
+                double[] layerErrors = new double[hiddenLayers[0].length];
+                for (int j = 0; j < hiddenLayers[hiddenLayers.length - 1].length; j++)
                 {
+                    double[] lastInputs;
+                    if (hiddenOutputs.length == 1)
+                    {
+                        lastInputs = row;
+                    }
+                    else
+                    {
+                        lastInputs = hiddenOutputs[hiddenOutputs.length - 2];
+                    }
                     double[] targetWeights = new double[targetNodes.length];
                     for (int k = 0; k < targetNodes.length; k++)
                     {
                         targetWeights[k] = targetNodes[k].getWeight(j);
                     }
-                    hiddenNodes[j].updateWeight(targetErrors, targetWeights, hiddenOutputs[j], row);
+                    layerErrors[j] = hiddenLayers[hiddenLayers.length - 1][j].updateWeight(targetErrors, targetWeights, hiddenOutputs[hiddenOutputs.length - 1][j], lastInputs);
+                }
+                for (int j = hiddenLayers.length - 2; j >= 0; j--)
+                {
+                    double[] lastInputs;
+                    if (j == 0)
+                    {
+                        lastInputs = row;
+                    }
+                    else
+                    {
+                        lastInputs = hiddenOutputs[j - 1];
+                    }
+                    double[] nextLayerErrors = new double[hiddenLayers[j + 1].length];
+                    for (int k = 0; k < hiddenLayers[j].length; k++)
+                    {
+                        double[] targetWeights = new double[hiddenLayers[j + 1].length];
+                        for (int l = 0; l < hiddenLayers[j + 1].length; l++)
+                        {
+                            targetWeights[l] = hiddenLayers[j + 1][l].getWeight(k);
+                        }
+                        nextLayerErrors[k] = layerErrors[k] = hiddenLayers[j][k].updateWeight(layerErrors, targetWeights, hiddenOutputs[j][k], lastInputs);
+                    }
                 }
             }
 
@@ -152,7 +226,12 @@ public class NeuralNet extends SupervisedLearner
                     bestFoundAtEpoch = epochCount;
                     epochsWithoutImprovement = 0;
                     bestValidationAccuracy = validationAccuracy;
-                    bestHiddenNodes = hiddenNodes.clone();
+//                    bestHiddenNodes = hiddenNodes.clone();
+                    bestHiddenLayers = new HiddenNode[layers][hiddenLayerSize];
+                    for (int i = 0; i < layers; i++)
+                    {
+                        bestHiddenLayers[i] = hiddenLayers[i].clone();
+                    }
                     bestTargetNodes = targetNodes.clone();
                     bestVSAccuracy = validationAccuracy;
                     bestTrainMSE = mseTrainSum / mseTrainCount;
@@ -164,7 +243,7 @@ public class NeuralNet extends SupervisedLearner
                 epochsWithoutImprovement++;
                 lastValidationAccuracy = validationAccuracy;
             }
-            if (epochsWithoutImprovement > 50)
+            if (epochsWithoutImprovement > 10 * Math.pow(10, layers))
             {
                 learning = false;
             }
@@ -179,19 +258,32 @@ public class NeuralNet extends SupervisedLearner
         System.out.println("Validation Accuracy: " + bestValidationAccuracy);
 //        fileWriter.write(learningRate + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
 //        fileWriter.write(hiddenLayerSize + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
-        fileWriter.write(momentumCoeff + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
-        hiddenNodes = bestHiddenNodes;
+//        fileWriter.write(momentumCoeff + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
+        fileWriter.write(layers + "," + bestFoundAtEpoch + "," + bestTrainMSE + "," + bestVSAccuracy + "," + bestVSMSE + ",");
+//        hiddenNodes = bestHiddenNodes;
+        hiddenLayers = bestHiddenLayers;
         targetNodes = bestTargetNodes;
     }
 
     @Override
     public void predict(double[] features, double[] labels) throws Exception
     {
-        double[] hiddenOutputs = new double[hiddenNodes.length];
-        for (int i = 0; i < hiddenNodes.length; i++)
+//        double[] hiddenOutputs = new double[hiddenNodes.length];
+//        for (int i = 0; i < hiddenNodes.length; i++)
+//        {
+//            hiddenOutputs[i] = hiddenNodes[i].output(features);
+//        }
+        double[] lastLayerOutputs = features;
+        double[][] hiddenOutputs = new double[hiddenLayers.length][hiddenLayers[0].length];
+        for (int i = 0; i < hiddenLayers.length; i++)
         {
-            hiddenOutputs[i] = hiddenNodes[i].output(features);
+            for (int j = 0; j <hiddenLayers[i].length; j++)
+            {
+                hiddenOutputs[i][j] = hiddenLayers[i][j].output(lastLayerOutputs);
+            }
+            lastLayerOutputs = hiddenOutputs[i];
         }
+
         double[] targetOutputs = new double[targetNodes.length];
         double prediction = -1.0;
         double highest = 0.0;
@@ -199,7 +291,8 @@ public class NeuralNet extends SupervisedLearner
         {
             for (int i = 0; i < targetNodes.length; i++)
             {
-                targetOutputs[i] = targetNodes[i].output(hiddenOutputs);
+//                targetOutputs[i] = targetNodes[i].output(hiddenOutputs);
+                targetOutputs[i] = targetNodes[i].output(hiddenOutputs[hiddenOutputs.length - 1]);
                 if (targetOutputs[i] > highest)
                 {
                     highest = targetOutputs[i];
@@ -209,7 +302,8 @@ public class NeuralNet extends SupervisedLearner
         }
         else
         {
-            double output = targetNodes[0].output(hiddenOutputs);
+//            double output = targetNodes[0].output(hiddenOutputs);
+            double output = targetNodes[0].output(hiddenOutputs[hiddenOutputs.length - 1]);
             if (output >= 0.5)
             {
                 prediction = 1.0;
@@ -227,10 +321,20 @@ public class NeuralNet extends SupervisedLearner
     {
         double meanSquaredSum = 0.0;
         int meanSquaredCount = 0;
-        double[] hiddenOutputs = new double[hiddenNodes.length];
-        for (int j = 0; j < hiddenNodes.length; j++)
+//        double[] hiddenOutputs = new double[hiddenNodes.length];
+//        for (int j = 0; j < hiddenNodes.length; j++)
+//        {
+//            hiddenOutputs[j] = hiddenNodes[j].output(features);
+//        }
+        double[] lastLayerOutputs = features;
+        double[][] hiddenOutputs = new double[hiddenLayers.length][hiddenLayers[0].length];
+        for (int i = 0; i < hiddenLayers.length; i++)
         {
-            hiddenOutputs[j] = hiddenNodes[j].output(features);
+            for (int j = 0; j <hiddenLayers[i].length; j++)
+            {
+                hiddenOutputs[i][j] = hiddenLayers[i][j].output(lastLayerOutputs);
+            }
+            lastLayerOutputs = hiddenOutputs[i];
         }
         // get the outputs from the target nodes by feeding them the output form the hidden nodes
         double[] targetOutputs = new double[targetNodes.length];
@@ -239,7 +343,7 @@ public class NeuralNet extends SupervisedLearner
         {
             // calc mean squared error for training set
             // outputs
-            targetOutputs[j] = targetNodes[j].output(hiddenOutputs);
+            targetOutputs[j] = targetNodes[j].output(hiddenOutputs[hiddenOutputs.length - 1]);
             // calculate the errors
             targetErrors[j] = targetNodes[j].error(targetOutputs[j], target);
             meanSquaredSum += Math.pow(targetErrors[j], 2);
@@ -268,6 +372,11 @@ public class NeuralNet extends SupervisedLearner
     public void setHiddenLayerSize(int size)
     {
         hiddenLayerSize = size;
+    }
+
+    public void setLayers(int layers)
+    {
+        this.layers = layers;
     }
 
     private abstract class Node
@@ -304,6 +413,12 @@ public class NeuralNet extends SupervisedLearner
 
             return output;
         }
+
+        public double getWeight(int input)
+        {
+            return weights[input];
+        }
+
 
         public void print()
         {
@@ -362,11 +477,6 @@ public class NeuralNet extends SupervisedLearner
             lastDeltas = deltas;
         }
 
-        public double getWeight(int input)
-        {
-            return weights[input];
-        }
-
         @Override
         public TargetNode clone()
         {
@@ -384,7 +494,7 @@ public class NeuralNet extends SupervisedLearner
             super(numInputs);
         }
 
-        public void updateWeight(double[] errors, double[] outputWeights, double output, double[] inputs)
+        public double updateWeight(double[] errors, double[] outputWeights, double output, double[] inputs)
         {
             double sum = 0;
             for (int i = 0; i < outputWeights.length; i++)
@@ -411,6 +521,8 @@ public class NeuralNet extends SupervisedLearner
                 weights[i] += deltas[i] + (momentum ? momentumCoeff * lastDeltas[i] : 0);
             }
             lastDeltas = deltas;
+
+            return error;
         }
 
         @Override

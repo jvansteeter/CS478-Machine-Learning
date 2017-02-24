@@ -136,14 +136,18 @@ public class MLSystemManager {
 			Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
 // 	        fileWriter.write("Learning Rate,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
 // 	        fileWriter.write("# Hidden Nodes,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
- 	        fileWriter.write("Momentum,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+// 	        fileWriter.write("Momentum,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+ 	        fileWriter.write("Layers,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
 			((NeuralNet)learner).setFileWriter(fileWriter);
 
 			int numberOfHiddenNodes = 64;
+			int numberOfLayers = 1;
 			((NeuralNet)learner).setHiddenLayerSize(numberOfHiddenNodes);
-			for (int i = 0; i < 10; i++)
+			for (int i = 0; i < 5; i++)
 			{
-				for (int j = 0; j < 10; j++)
+				((NeuralNet)learner).setLayers(numberOfLayers);
+				System.out.println("Running " + numberOfLayers + " layer net");
+				for (int j = 0; j < 1; j++)
 				{
 					double startTime = System.currentTimeMillis();
 					learner.train(trainFeatures, trainLabels);
@@ -162,7 +166,8 @@ public class MLSystemManager {
 						System.out.println("\n");
 					}
 				}
-				((NeuralNet)learner).incrementMomentum();
+				numberOfLayers++;
+//				((NeuralNet)learner).incrementMomentum();
 //				((NeuralNet)learner).incrementLearningRate();
 //				numberOfHiddenNodes *= 2;
 			}
