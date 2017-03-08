@@ -1,0 +1,19 @@
+% Example homework from call
+
+@RELATION pizza
+
+@ATTRIBUTE  meat    { Y, N}
+@ATTRIBUTE  crust   { Thin, Deep, Stuffed }
+@ATTRIBUTE  veg     { Y, N }
+@ATTRIBUTE  class   { Bad, Good, Great }
+
+@DATA
+Y,Thin,N,Great
+N,Deep,N,Bad
+N,Stuffed,Y,Good
+Y,Stuffed,Y,Great
+Y,Deep,N,Good
+Y,Deep,Y,Great
+N,Thin,Y,Good
+Y,Deep,N,Good
+N,Thin,N,Bad
