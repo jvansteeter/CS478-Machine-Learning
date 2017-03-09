@@ -15,11 +15,18 @@ public class DecisionTree extends SupervisedLearner
         head = new Node(entrySet);
 //        head.train(-1, 0);
         head.train();
+//        head.printTree();
     }
 
     @Override
     public void predict(double[] features, double[] prediction) throws Exception
     {
+        System.out.print("predict: ");
+        for (double thing : features)
+        {
+            System.out.print(thing + " ");
+        }
+        System.out.println();
         prediction[0] = head.predict(features);
     }
 
@@ -208,10 +215,40 @@ public class DecisionTree extends SupervisedLearner
             {
                 double nominalValue = features[splitOnFeature];
                 features = removeFeature(features, splitOnFeature);
+//                System.out.println("Nom: " + nominalValue);
+                System.out.println(splitOnFeature);
                 return children[(int) nominalValue].predict(features);
             }
 
             return entrySet.targets.mostCommonValue(0);
+        }
+
+        public void printTree()
+        {
+            System.out.println("Head");
+            System.out.println("Split on: " + splitOnFeature);
+            for (int i = 0; i < children.length; i++)
+            {
+                children[i].printTree(1, 0, i);
+            }
+        }
+
+        public void printTree(int layer, int parent, int child)
+        {
+            System.out.println("Layer: " + layer + ": " + parent + ", " + child);
+            layer++;
+            if (!endNode)
+            {
+                System.out.println("Split on " + splitOnFeature);
+                for (int i = 0; i < children.length; i++)
+                {
+                    children[i].printTree(layer, child, i);
+                }
+            }
+            else
+            {
+                System.out.println("End Node of class: " + entrySet.targets.mostCommonValue(0));
+            }
         }
 
         private double[] removeFeature(double[] input, int col)
