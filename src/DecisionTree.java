@@ -6,15 +6,40 @@ public class DecisionTree extends SupervisedLearner
 
     public DecisionTree()
     {
-        head = new Node();
     }
 
     @Override
     public void train(Matrix features, Matrix targets) throws Exception
     {
         EntrySet entrySet = new EntrySet(features, targets);
+        head = new Node(entrySet);
         double[] infoGains = entrySet.getFeatureInfoGains();
+        System.out.println("Info 1");
+        for (double info : infoGains)
+        {
+            System.out.println(info);
+        }
+        double bestFeature = 0;
+        int bestFeatureIndex = 0;
+        for (int i = 0; i < infoGains.length; i++)
+        {
+            if (infoGains[i] > bestFeature)
+            {
+                bestFeature = infoGains[i];
+                bestFeatureIndex = i;
+            }
+        }
+        head.splitOnFeature = bestFeatureIndex;
+        EntrySet[] splits = entrySet.splitOnFeature(0);
+        head.children = new Node[splits.length];
+        for (int i = 0; i < splits.length; i++)
+        {
+            head.children[i] = new Node(splits[i]);
+        }
+        infoGains = head.children[0].entrySet.getFeatureInfoGains();
 
+        System.out.println("Info 2");
+        System.out.println(head.children[0].entrySet.getInfo());
         for (double info : infoGains)
         {
             System.out.println(info);
@@ -22,19 +47,14 @@ public class DecisionTree extends SupervisedLearner
 
 //        features.print();
 //        targets.print();
-        for (int i = 0; i < features.rows(); i++)
-        {
-            for (double item : features.row(i))
-            {
-                System.out.print(item + " ");
-            }
-            System.out.println();
-        }
-        EntrySet[] test = entrySet.splitOnFeature(0);
-        test[0].print();
-        test[0].targets.print();
-        test[1].print();
-        test[1].targets.print();
+//        for (int i = 0; i < features.rows(); i++)
+//        {
+//            for (double item : features.row(i))
+//            {
+//                System.out.print(item + " ");
+//            }
+//            System.out.println();
+//        }
     }
 
     @Override
@@ -56,8 +76,10 @@ public class DecisionTree extends SupervisedLearner
         public double getInfo()
         {
             double totalInfo = 0.0;
-            int numberOfClasses = targets.valueCount(0);
+            int numberOfClasses = (int) targets.columnMax(0) + 1;
             int entries = this.rows();
+
+//            System.out.println("getInfo()");
 
             for (int i = 0; i < numberOfClasses; i++)
             {
@@ -69,6 +91,7 @@ public class DecisionTree extends SupervisedLearner
                         count += 1;
                     }
                 }
+//                System.out.println("here: " + -(count / entries) * (Math.log(count / entries) / Math.log(2)));
                 totalInfo += -(count / entries) * (Math.log(count / entries) / Math.log(2));
             }
 
@@ -105,9 +128,9 @@ public class DecisionTree extends SupervisedLearner
             return infoGains;
         }
 
-        public int[] featureCounts(int col)
+        private int[] featureCounts(int col)
         {
-            int[] counts = new int[this.valueCount(col)];
+            int[] counts = new int[(int)this.columnMax(col) + 1];
             for (int i = 0; i < this.rows(); i++)
             {
                 counts[(int) this.row(i)[col]]++;
@@ -116,9 +139,9 @@ public class DecisionTree extends SupervisedLearner
             return counts;
         }
 
-        public int[] featureClassCounts(int col, double nominalValue)
+        private int[] featureClassCounts(int col, double nominalValue)
         {
-            int[] counts = new int[this.targets.valueCount(0)];
+            int[] counts = new int[(int)this.targets.columnMax(0) + 1];
             for (int i = 0; i < this.rows(); i++)
             {
                 if (this.row(i)[col] == nominalValue)
@@ -172,11 +195,12 @@ public class DecisionTree extends SupervisedLearner
         private boolean endNode;
         private Node[] children;
         private int splitOnFeature;
-        private double featureValue;
+        private double[] splitFeatures;
+        private EntrySet entrySet;
 
-        public Node()
+        public Node(EntrySet entrySet)
         {
-
+            this.entrySet = entrySet;
         }
     }
 }
