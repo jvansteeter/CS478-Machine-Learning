@@ -2,9 +2,9 @@
 
 @RELATION pizza
 
-@ATTRIBUTE  meat    { Y, N}
+@ATTRIBUTE  meat    {N,Y}
 @ATTRIBUTE  crust   { Thin, Deep, Stuffed }
-@ATTRIBUTE  veg     { Y, N }
+@ATTRIBUTE  veg     {N,Y}
 @ATTRIBUTE  class   { Bad, Good, Great }
 
 @DATA
