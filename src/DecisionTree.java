@@ -13,54 +13,14 @@ public class DecisionTree extends SupervisedLearner
     {
         EntrySet entrySet = new EntrySet(features, targets);
         head = new Node(entrySet);
-        double[] infoGains = entrySet.getFeatureInfoGains();
-        System.out.println("Info 1");
-        for (double info : infoGains)
-        {
-            System.out.println(info);
-        }
-        double bestFeature = 0;
-        int bestFeatureIndex = 0;
-        for (int i = 0; i < infoGains.length; i++)
-        {
-            if (infoGains[i] > bestFeature)
-            {
-                bestFeature = infoGains[i];
-                bestFeatureIndex = i;
-            }
-        }
-        head.splitOnFeature = bestFeatureIndex;
-        EntrySet[] splits = entrySet.splitOnFeature(0);
-        head.children = new Node[splits.length];
-        for (int i = 0; i < splits.length; i++)
-        {
-            head.children[i] = new Node(splits[i]);
-        }
-        infoGains = head.children[0].entrySet.getFeatureInfoGains();
-
-        System.out.println("Info 2");
-        System.out.println(head.children[0].entrySet.getInfo());
-        for (double info : infoGains)
-        {
-            System.out.println(info);
-        }
-
-//        features.print();
-//        targets.print();
-//        for (int i = 0; i < features.rows(); i++)
-//        {
-//            for (double item : features.row(i))
-//            {
-//                System.out.print(item + " ");
-//            }
-//            System.out.println();
-//        }
+//        head.train(-1, 0);
+        head.train();
     }
 
     @Override
     public void predict(double[] features, double[] prediction) throws Exception
     {
-
+        prediction[0] = head.predict(features);
     }
 
     private class EntrySet extends Matrix
@@ -78,9 +38,6 @@ public class DecisionTree extends SupervisedLearner
             double totalInfo = 0.0;
             int numberOfClasses = (int) targets.columnMax(0) + 1;
             int entries = this.rows();
-
-//            System.out.println("getInfo()");
-
             for (int i = 0; i < numberOfClasses; i++)
             {
                 double count = 0;
@@ -91,7 +48,10 @@ public class DecisionTree extends SupervisedLearner
                         count += 1;
                     }
                 }
-//                System.out.println("here: " + -(count / entries) * (Math.log(count / entries) / Math.log(2)));
+                if (count == 0)
+                {
+                    continue;
+                }
                 totalInfo += -(count / entries) * (Math.log(count / entries) / Math.log(2));
             }
 
@@ -155,9 +115,9 @@ public class DecisionTree extends SupervisedLearner
 
         public EntrySet[] splitOnFeature(int col)
         {
-            EntrySet[] results = new EntrySet[this.valueCount(col)];
+            EntrySet[] results = new EntrySet[(int)this.columnMax(col) + 1];
             int[] featureCounts = this.featureCounts(col);
-            for (int featureIndex = 0; featureIndex < this.valueCount(col); featureIndex++)
+            for (int featureIndex = 0; featureIndex < this.columnMax(col) + 1; featureIndex++)
             {
                 Matrix newMatrix = new Matrix();
                 Matrix newTargets = new Matrix();
@@ -195,12 +155,81 @@ public class DecisionTree extends SupervisedLearner
         private boolean endNode;
         private Node[] children;
         private int splitOnFeature;
-        private double[] splitFeatures;
         private EntrySet entrySet;
 
         public Node(EntrySet entrySet)
         {
             this.entrySet = entrySet;
+            endNode = false;
+        }
+
+//        public void train(int parent, int childNum)
+        public void train()
+        {
+//            parent++;
+//            System.out.println("Info Layer: " + parent + " Child#: " + childNum);
+            if (entrySet.cols() > 1)
+            {
+                double[] infoGains = entrySet.getFeatureInfoGains();
+//                for (double info : infoGains)
+//                {
+//                    System.out.println(info);
+//                }
+
+                double bestFeature = 0;
+                int bestFeatureIndex = 0;
+                for (int i = 0; i < infoGains.length; i++)
+                {
+                    if (infoGains[i] > bestFeature)
+                    {
+                        bestFeature = infoGains[i];
+                        bestFeatureIndex = i;
+                    }
+                }
+                splitOnFeature = bestFeatureIndex;
+                EntrySet[] splits = entrySet.splitOnFeature(splitOnFeature);
+                children = new Node[splits.length];
+                for (int i = 0; i < splits.length; i++)
+                {
+                    children[i] = new Node(splits[i]);
+//                    children[i].train(parent, i);
+                    children[i].train();
+                }
+            }
+            else
+            {
+                endNode = true;
+            }
+        }
+
+        public double predict(double[] features)
+        {
+            if (!endNode)
+            {
+                double nominalValue = features[splitOnFeature];
+                features = removeFeature(features, splitOnFeature);
+                return children[(int) nominalValue].predict(features);
+            }
+
+            return entrySet.targets.mostCommonValue(0);
+        }
+
+        private double[] removeFeature(double[] input, int col)
+        {
+            double[] newFeatures = new double[input.length - 1];
+            for(int i = 0; i < input.length - 1; i++)
+            {
+                if (i < col)
+                {
+                    newFeatures[i] = input[i];
+                }
+                else
+                {
+                    newFeatures[i] = input[i + 1];
+                }
+            }
+
+            return newFeatures;
         }
     }
 }
