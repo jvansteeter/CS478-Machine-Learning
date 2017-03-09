@@ -1,11 +1,14 @@
 import java.util.ArrayList;
+import java.util.Random;
 
 public class DecisionTree extends SupervisedLearner
 {
     private Node head;
+    private Random rand;
 
-    public DecisionTree()
+    public DecisionTree(Random rand)
     {
+        this.rand = rand;
     }
 
     @Override
@@ -13,6 +16,7 @@ public class DecisionTree extends SupervisedLearner
     {
         EntrySet entrySet = new EntrySet(features, targets);
         head = new Node(entrySet);
+        head.address = "head";
 //        head.train(-1, 0);
         head.train();
 //        head.printTree();
@@ -21,12 +25,12 @@ public class DecisionTree extends SupervisedLearner
     @Override
     public void predict(double[] features, double[] prediction) throws Exception
     {
-        System.out.print("predict: ");
-        for (double thing : features)
-        {
-            System.out.print(thing + " ");
-        }
-        System.out.println();
+//        System.out.print("predict: ");
+//        for (double thing : features)
+//        {
+//            System.out.print(thing + " ");
+//        }
+//        System.out.println();
         prediction[0] = head.predict(features);
     }
 
@@ -163,6 +167,7 @@ public class DecisionTree extends SupervisedLearner
         private Node[] children;
         private int splitOnFeature;
         private EntrySet entrySet;
+        private String address = "";
 
         public Node(EntrySet entrySet)
         {
@@ -199,6 +204,7 @@ public class DecisionTree extends SupervisedLearner
                 for (int i = 0; i < splits.length; i++)
                 {
                     children[i] = new Node(splits[i]);
+                    children[i].address = this.address + "->" + i;
 //                    children[i].train(parent, i);
                     children[i].train();
                 }
@@ -211,12 +217,18 @@ public class DecisionTree extends SupervisedLearner
 
         public double predict(double[] features)
         {
+//            System.out.println(address);
             if (!endNode)
             {
                 double nominalValue = features[splitOnFeature];
                 features = removeFeature(features, splitOnFeature);
 //                System.out.println("Nom: " + nominalValue);
-                System.out.println(splitOnFeature);
+//                System.out.println(entrySet.featureCounts(0)[0]);
+//                System.out.println(children.length);
+                if (nominalValue >= children.length)
+                {
+                    nominalValue = Math.abs(rand.nextInt()) % children.length;
+                }
                 return children[(int) nominalValue].predict(features);
             }
 
@@ -229,20 +241,21 @@ public class DecisionTree extends SupervisedLearner
             System.out.println("Split on: " + splitOnFeature);
             for (int i = 0; i < children.length; i++)
             {
-                children[i].printTree(1, 0, i);
+                children[i].printTree(1, "" + i);
             }
         }
 
-        public void printTree(int layer, int parent, int child)
+        public void printTree(int layer, String address)
         {
-            System.out.println("Layer: " + layer + ": " + parent + ", " + child);
+            System.out.println("Layer: " + layer + ": " + address);
+            System.out.println(children == null ? "0" : children.length);
             layer++;
             if (!endNode)
             {
                 System.out.println("Split on " + splitOnFeature);
                 for (int i = 0; i < children.length; i++)
                 {
-                    children[i].printTree(layer, child, i);
+                    children[i].printTree(layer, address + "->" + i);
                 }
             }
             else
