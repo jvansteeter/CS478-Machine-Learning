@@ -6,73 +6,87 @@ public class DecisionTree extends SupervisedLearner
     private Node head;
     private Random rand;
     private HashSet<Node> prunableNodes;
+    private boolean prune;
 
     public DecisionTree(Random rand)
     {
         this.rand = rand;
         prunableNodes = new HashSet<>();
+        prune = false;
     }
 
     @Override
     public void train(Matrix features, Matrix targets) throws Exception
     {
-        // separate into test and training sets
-        int trainingSetSize = (int) (features.rows() * .8);
-        features.shuffle(rand, targets);
-        Matrix trainingFeatures = new Matrix(features, 0, 0, trainingSetSize, features.cols());
-        Matrix trainingTargets = new Matrix(targets, 0, 0, trainingSetSize, 1);
-        Matrix validationFeatures = new Matrix(features, trainingSetSize, 0, features.rows() - trainingSetSize, features.cols());
-        Matrix validationTargets = new Matrix(targets, trainingSetSize, 0, features.rows() - trainingSetSize, 1);
-
-        EntrySet entrySet = new EntrySet(trainingFeatures, trainingTargets);
-        head = new Node(entrySet);
-        head.address = "head";
-        head.train();
-        double originalAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
-
-        // begin the super obnoxious process of error pruning
-        HashSet<Node> pruned = new HashSet<>();
-        double bestValidationAccuracy = originalAccuracy;
-        System.out.println("Original Validation Accuracy: " + originalAccuracy);
-        while (prunableNodes.size() > 0)
+        if (!prune)
         {
-            HashSet<Node> nodesToRemove = new HashSet<>();
-            HashSet<Node> nodesToAdd = new HashSet<>();
-            for (Node node : prunableNodes)
+            EntrySet entrySet = new EntrySet(features, targets);
+            head = new Node(entrySet);
+            head.address = "head";
+            head.train();
+//            head.printTree();
+        }
+        else
+        {
+            // separate into test and training sets
+            int trainingSetSize = (int) (features.rows() * .8);
+            features.shuffle(rand, targets);
+            Matrix trainingFeatures = new Matrix(features, 0, 0, trainingSetSize, features.cols());
+            Matrix trainingTargets = new Matrix(targets, 0, 0, trainingSetSize, 1);
+            Matrix validationFeatures = new Matrix(features, trainingSetSize, 0, features.rows() - trainingSetSize, features.cols());
+            Matrix validationTargets = new Matrix(targets, trainingSetSize, 0, features.rows() - trainingSetSize, 1);
+
+            EntrySet entrySet = new EntrySet(trainingFeatures, trainingTargets);
+            head = new Node(entrySet);
+            head.address = "head";
+            head.train();
+//            head.printTree();
+
+            // begin the super obnoxious process of error pruning
+            double originalAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
+            HashSet<Node> pruned = new HashSet<>();
+            double bestValidationAccuracy = originalAccuracy;
+            System.out.println("Original Validation Accuracy: " + originalAccuracy);
+            while (prunableNodes.size() > 0)
             {
-                head.unPrune();
-                for (Node hasBeenPruned : pruned)
+                HashSet<Node> nodesToRemove = new HashSet<>();
+                HashSet<Node> nodesToAdd = new HashSet<>();
+                for (Node node : prunableNodes)
                 {
-                    hasBeenPruned.isPruned = true;
-                }
-                node.isPruned = true;
-                double validationAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
-                if (validationAccuracy < bestValidationAccuracy)
-                {
-                    nodesToRemove.add(node);
-                }
-                else
-                {
-                    bestValidationAccuracy = validationAccuracy;
-                    pruned.add(node);
-                    nodesToRemove.add(node);
-                    if (node.parent != null)
+                    head.unPrune();
+                    for (Node hasBeenPruned : pruned)
                     {
-                        nodesToAdd.add(node.parent);
+                        hasBeenPruned.isPruned = true;
+                    }
+                    node.isPruned = true;
+                    double validationAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
+                    if (validationAccuracy < bestValidationAccuracy)
+                    {
+                        nodesToRemove.add(node);
+                    }
+                    else
+                    {
+                        bestValidationAccuracy = validationAccuracy;
+                        pruned.add(node);
+                        nodesToRemove.add(node);
+                        if (node.parent != null)
+                        {
+                            nodesToAdd.add(node.parent);
+                        }
                     }
                 }
+                prunableNodes.removeAll(nodesToRemove);
+                prunableNodes.addAll(nodesToAdd);
             }
-            prunableNodes.removeAll(nodesToRemove);
-            prunableNodes.addAll(nodesToAdd);
-        }
 
-        head.unPrune();
-        for (Node node : pruned)
-        {
-            node.isPruned = true;
+            head.unPrune();
+            for (Node node : pruned)
+            {
+                node.isPruned = true;
+            }
+            System.out.println("Pruned Validation Accuracy: " + bestValidationAccuracy);
+            System.out.println("Able to prune " + pruned.size() + " nodes");
         }
-        System.out.println("Pruned Validation Accuracy: " + bestValidationAccuracy);
-        System.out.println("Able to prune " + pruned.size() + " nodes");
     }
 
     @Override
@@ -87,6 +101,26 @@ public class DecisionTree extends SupervisedLearner
             }
         }
         prediction[0] = head.predict(features);
+    }
+
+    public void setPrune(boolean prune)
+    {
+        this.prune = prune;
+    }
+
+    public boolean isPrune()
+    {
+        return prune;
+    }
+
+    public int nodeCount()
+    {
+        return head.nodeCount();
+    }
+
+    public int depth()
+    {
+        return head.getDepth();
     }
 
     private class EntrySet extends Matrix
@@ -253,11 +287,13 @@ public class DecisionTree extends SupervisedLearner
         private String address = "";
         private boolean isPruned = false;
         private Node parent = null;
+        private int depth;
 
         public Node(EntrySet entrySet)
         {
             this.entrySet = entrySet;
             endNode = false;
+            depth = 0;
         }
 
         public void train()
@@ -289,6 +325,7 @@ public class DecisionTree extends SupervisedLearner
                     children[i] = new Node(splits[i]);
                     children[i].parent = this;
                     children[i].address = this.address + "->" + i;
+                    children[i].depth = this.depth + 1;
                     children[i].train();
                 }
             }
@@ -315,6 +352,51 @@ public class DecisionTree extends SupervisedLearner
             return entrySet.targets.mostCommonValue(0);
         }
 
+        public int getDepth()
+        {
+            if (isPruned)
+            {
+                return 0;
+            }
+            if (children != null)
+            {
+                int deepest = 0;
+                for (Node child : children)
+                {
+                    if (child.getDepth() > deepest)
+                    {
+                        deepest = child.getDepth();
+                    }
+                }
+                return deepest;
+            }
+
+            return depth;
+        }
+
+        public int nodeCount()
+        {
+            int[] count = {1};
+            nodeCount(count);
+
+            return count[0];
+        }
+
+        private void nodeCount(int[] count)
+        {
+            if (!isPruned)
+            {
+                count[0]++;
+            }
+            if (children != null)
+            {
+                for (Node child : children)
+                {
+                    child.nodeCount(count);
+                }
+            }
+        }
+
         public void unPrune()
         {
             isPruned = false;
@@ -329,25 +411,13 @@ public class DecisionTree extends SupervisedLearner
 
         public void printTree()
         {
-            System.out.println("Head");
-            System.out.println("Split on: " + splitOnFeature);
-            for (int i = 0; i < children.length; i++)
-            {
-                children[i].printTree(1, "" + i);
-            }
-        }
-
-        public void printTree(int layer, String address)
-        {
-            System.out.println("Layer: " + layer + ": " + address);
-            System.out.println(children == null ? "0" : children.length);
-            layer++;
+            System.out.println(address);
             if (!endNode)
             {
                 System.out.println("Split on " + splitOnFeature);
                 for (int i = 0; i < children.length; i++)
                 {
-                    children[i].printTree(layer, address + "->" + i);
+                    children[i].printTree();
                 }
             }
             else

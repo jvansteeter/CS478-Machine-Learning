@@ -29,7 +29,7 @@ public class MLSystemManager {
 		//args = new String[]{"-L", "baseline", "-A", "data/iris.arff", "-E", "cross", "10", "-N"};
 
 		//Random rand = new Random(1234); // Use a seed for deterministic results (makes debugging easier)
-		Random rand = new Random(10); // No seed for non-deterministic results
+		Random rand = new Random(); // No seed for non-deterministic results
 
 		//Parse the command line arguments
 		ArgParser parser = new ArgParser(args);
@@ -178,7 +178,8 @@ public class MLSystemManager {
 				throw new Exception("Number of folds must be greater than 0");
 			System.out.println("Number of folds: " + folds);
 			fileWriter.write(fileName + "\n");
-			fileWriter.write("train accuracy,test accuracy\n");
+			((DecisionTree)learner).setPrune(false);
+//			fileWriter.write("train accuracy,test accuracy\n");
 			int reps = 1;
 			double sumAccuracy = 0.0;
 			double elapsedTime = 0.0;
@@ -201,13 +202,17 @@ public class MLSystemManager {
 					sumAccuracy += accuracy;
 					System.out.println("Rep=" + j + ", Fold=" + i + ", Train Accuracy=" + trainAccuracy);
 					System.out.println("Rep=" + j + ", Fold=" + i + ", Test Accuracy=" + accuracy);
-					fileWriter.write(trainAccuracy + "," + accuracy + "\n");
+//					fileWriter.write(trainAccuracy + "," + accuracy + "\n");
 				}
 			}
 			elapsedTime /= (reps * folds);
 			System.out.println("Average time to train (in seconds): " + elapsedTime / 1000.0);
 			System.out.println("Mean accuracy=" + (sumAccuracy / (reps * folds)));
-			fileWriter.write("Average\n" + (sumAccuracy / (reps * folds)));
+//			fileWriter.write("Average\n" + (sumAccuracy / (reps * folds)));
+			fileWriter.write("Pruned," + ((DecisionTree)learner).isPrune() + "\n");
+			fileWriter.write("# of nodes," + ((DecisionTree)learner).nodeCount() + "\n");
+			fileWriter.write("Tree depth," + ((DecisionTree)learner).depth() + "\n");
+			fileWriter.write("Average," + (sumAccuracy / (reps * folds)) + "\n");
 		}
 		fileWriter.close();
 	}
