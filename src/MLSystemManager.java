@@ -55,6 +55,16 @@ public class MLSystemManager {
 			data.normalize();
 		}
 
+		// create file for result storing
+		File outputFile = new File("results.csv");
+		if (outputFile.exists())
+		{
+			outputFile.delete();
+		}
+		outputFile.createNewFile();
+		Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
+//		fileWriter.write("Layers,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
+
 		// Print some stats
 		System.out.println();
 		System.out.println("Dataset name: " + fileName);
@@ -127,26 +137,14 @@ public class MLSystemManager {
 			Matrix testLabels = new Matrix(data, trainSize, data.cols() - 1, data.rows() - trainSize, 1);
 
 
-			File outputFile = new File("results.csv");
-			if (outputFile.exists())
-			{
-				outputFile.delete();
-			}
-			outputFile.createNewFile();
-			Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
-// 	        fileWriter.write("Learning Rate,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
-// 	        fileWriter.write("# Hidden Nodes,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
-// 	        fileWriter.write("Momentum,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
- 	        fileWriter.write("Layers,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
-			((NeuralNet)learner).setFileWriter(fileWriter);
 
 			int numberOfHiddenNodes = 64;
 			int numberOfLayers = 1;
-			((NeuralNet)learner).setHiddenLayerSize(numberOfHiddenNodes);
-			for (int i = 0; i < 5; i++)
+//			((NeuralNet)learner).setHiddenLayerSize(numberOfHiddenNodes);
+			for (int i = 0; i < 1; i++)
 			{
-				((NeuralNet)learner).setLayers(numberOfLayers);
-				System.out.println("Running " + numberOfLayers + " layer net");
+//				((NeuralNet)learner).setLayers(numberOfLayers);
+//				System.out.println("Running " + numberOfLayers + " layer net");
 				for (int j = 0; j < 1; j++)
 				{
 					double startTime = System.currentTimeMillis();
@@ -171,7 +169,6 @@ public class MLSystemManager {
 //				((NeuralNet)learner).incrementLearningRate();
 //				numberOfHiddenNodes *= 2;
 			}
-			fileWriter.close();
 		}
 		else if (evalMethod.equals("cross"))
 		{
@@ -180,6 +177,8 @@ public class MLSystemManager {
 			if (folds <= 0)
 				throw new Exception("Number of folds must be greater than 0");
 			System.out.println("Number of folds: " + folds);
+			fileWriter.write(fileName + "\n");
+			fileWriter.write("train accuracy,test accuracy\n");
 			int reps = 1;
 			double sumAccuracy = 0.0;
 			double elapsedTime = 0.0;
@@ -197,15 +196,20 @@ public class MLSystemManager {
 					double startTime = System.currentTimeMillis();
 					learner.train(trainFeatures, trainLabels);
 					elapsedTime += System.currentTimeMillis() - startTime;
+					double trainAccuracy = learner.measureAccuracy(trainFeatures, trainLabels, null);
 					double accuracy = learner.measureAccuracy(testFeatures, testLabels, null);
 					sumAccuracy += accuracy;
-					System.out.println("Rep=" + j + ", Fold=" + i + ", Accuracy=" + accuracy);
+					System.out.println("Rep=" + j + ", Fold=" + i + ", Train Accuracy=" + trainAccuracy);
+					System.out.println("Rep=" + j + ", Fold=" + i + ", Test Accuracy=" + accuracy);
+					fileWriter.write(trainAccuracy + "," + accuracy + "\n");
 				}
 			}
 			elapsedTime /= (reps * folds);
 			System.out.println("Average time to train (in seconds): " + elapsedTime / 1000.0);
 			System.out.println("Mean accuracy=" + (sumAccuracy / (reps * folds)));
+			fileWriter.write("Average\n" + (sumAccuracy / (reps * folds)));
 		}
+		fileWriter.close();
 	}
 
 	/**

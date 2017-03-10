@@ -1,36 +1,91 @@
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Random;
 
 public class DecisionTree extends SupervisedLearner
 {
     private Node head;
     private Random rand;
+    private HashSet<Node> prunableNodes;
 
     public DecisionTree(Random rand)
     {
         this.rand = rand;
+        prunableNodes = new HashSet<>();
     }
 
     @Override
     public void train(Matrix features, Matrix targets) throws Exception
     {
-        EntrySet entrySet = new EntrySet(features, targets);
+        // separate into test and training sets
+        int trainingSetSize = (int) (features.rows() * .8);
+        features.shuffle(rand, targets);
+        Matrix trainingFeatures = new Matrix(features, 0, 0, trainingSetSize, features.cols());
+        Matrix trainingTargets = new Matrix(targets, 0, 0, trainingSetSize, 1);
+        Matrix validationFeatures = new Matrix(features, trainingSetSize, 0, features.rows() - trainingSetSize, features.cols());
+        Matrix validationTargets = new Matrix(targets, trainingSetSize, 0, features.rows() - trainingSetSize, 1);
+
+        EntrySet entrySet = new EntrySet(trainingFeatures, trainingTargets);
         head = new Node(entrySet);
         head.address = "head";
-//        head.train(-1, 0);
         head.train();
-//        head.printTree();
+        double originalAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
+
+        // begin the super obnoxious process of error pruning
+        HashSet<Node> pruned = new HashSet<>();
+        double bestValidationAccuracy = originalAccuracy;
+        System.out.println("Original Validation Accuracy: " + originalAccuracy);
+        while (prunableNodes.size() > 0)
+        {
+            HashSet<Node> nodesToRemove = new HashSet<>();
+            HashSet<Node> nodesToAdd = new HashSet<>();
+            for (Node node : prunableNodes)
+            {
+                head.unPrune();
+                for (Node hasBeenPruned : pruned)
+                {
+                    hasBeenPruned.isPruned = true;
+                }
+                node.isPruned = true;
+                double validationAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
+                if (validationAccuracy < bestValidationAccuracy)
+                {
+                    nodesToRemove.add(node);
+                }
+                else
+                {
+                    bestValidationAccuracy = validationAccuracy;
+                    pruned.add(node);
+                    nodesToRemove.add(node);
+                    if (node.parent != null)
+                    {
+                        nodesToAdd.add(node.parent);
+                    }
+                }
+            }
+            prunableNodes.removeAll(nodesToRemove);
+            prunableNodes.addAll(nodesToAdd);
+        }
+
+        head.unPrune();
+        for (Node node : pruned)
+        {
+            node.isPruned = true;
+        }
+        System.out.println("Pruned Validation Accuracy: " + bestValidationAccuracy);
+        System.out.println("Able to prune " + pruned.size() + " nodes");
     }
 
     @Override
     public void predict(double[] features, double[] prediction) throws Exception
     {
-//        System.out.print("predict: ");
-//        for (double thing : features)
-//        {
-//            System.out.print(thing + " ");
-//        }
-//        System.out.println();
+        double[] columnMaxes = head.entrySet.getColumnMaxes();
+        for (int i = 0; i < features.length; i++)
+        {
+            if (features[i] > columnMaxes[i])
+            {
+                features[i] = columnMaxes[i];
+            }
+        }
         prediction[0] = head.predict(features);
     }
 
@@ -40,8 +95,21 @@ public class DecisionTree extends SupervisedLearner
 
         public EntrySet(Matrix matrix, Matrix targets)
         {
-            super(matrix, 0, 0, matrix.rows(), matrix.cols());
             this.targets = targets;
+            this.setSize(matrix.rows(), matrix.cols());
+            for (int row = 0; row < matrix.rows(); row++)
+            {
+                for (int col = 0; col < matrix.cols(); col++)
+                {
+                    double max = matrix.columnMax(col);
+                    double value = matrix.get(row, col);
+                    if (value > max)
+                    {
+                        value = max + 1;
+                    }
+                    set(row, col, value);
+                }
+            }
         }
 
         public double getInfo()
@@ -74,6 +142,10 @@ public class DecisionTree extends SupervisedLearner
             double[] infoGains = new double[this.cols()];
             int entries = this.rows();
             double totalInfo = this.getInfo();
+            if (totalInfo == 0)
+            {
+                return infoGains;
+            }
             for (int feature = 0; feature < this.cols(); feature++)
             {
                 int[] featureCount = this.featureCounts(feature);
@@ -101,7 +173,7 @@ public class DecisionTree extends SupervisedLearner
 
         private int[] featureCounts(int col)
         {
-            int[] counts = new int[(int)this.columnMax(col) + 1];
+            int[] counts = new int[(int) this.columnMax(col) + 1];
             for (int i = 0; i < this.rows(); i++)
             {
                 counts[(int) this.row(i)[col]]++;
@@ -112,7 +184,7 @@ public class DecisionTree extends SupervisedLearner
 
         private int[] featureClassCounts(int col, double nominalValue)
         {
-            int[] counts = new int[(int)this.targets.columnMax(0) + 1];
+            int[] counts = new int[(int) this.targets.columnMax(0) + 1];
             for (int i = 0; i < this.rows(); i++)
             {
                 if (this.row(i)[col] == nominalValue)
@@ -126,7 +198,7 @@ public class DecisionTree extends SupervisedLearner
 
         public EntrySet[] splitOnFeature(int col)
         {
-            EntrySet[] results = new EntrySet[(int)this.columnMax(col) + 1];
+            EntrySet[] results = new EntrySet[(int) this.columnMax(col) + 1];
             int[] featureCounts = this.featureCounts(col);
             for (int featureIndex = 0; featureIndex < this.columnMax(col) + 1; featureIndex++)
             {
@@ -159,6 +231,17 @@ public class DecisionTree extends SupervisedLearner
 
             return results;
         }
+
+        public double[] getColumnMaxes()
+        {
+            double[] maxes = new double[this.cols()];
+            for (int i = 0; i < this.cols(); i++)
+            {
+                maxes[i] = this.columnMax(i);
+            }
+
+            return maxes;
+        }
     }
 
     private class Node
@@ -168,6 +251,8 @@ public class DecisionTree extends SupervisedLearner
         private int splitOnFeature;
         private EntrySet entrySet;
         private String address = "";
+        private boolean isPruned = false;
+        private Node parent = null;
 
         public Node(EntrySet entrySet)
         {
@@ -175,19 +260,11 @@ public class DecisionTree extends SupervisedLearner
             endNode = false;
         }
 
-//        public void train(int parent, int childNum)
         public void train()
         {
-//            parent++;
-//            System.out.println("Info Layer: " + parent + " Child#: " + childNum);
             if (entrySet.cols() > 1)
             {
                 double[] infoGains = entrySet.getFeatureInfoGains();
-//                for (double info : infoGains)
-//                {
-//                    System.out.println(info);
-//                }
-
                 double bestFeature = 0;
                 int bestFeatureIndex = 0;
                 for (int i = 0; i < infoGains.length; i++)
@@ -198,33 +275,36 @@ public class DecisionTree extends SupervisedLearner
                         bestFeatureIndex = i;
                     }
                 }
+                if (bestFeature == 0)
+                {
+                    prunableNodes.add(this.parent);
+                    endNode = true;
+                    return;
+                }
                 splitOnFeature = bestFeatureIndex;
                 EntrySet[] splits = entrySet.splitOnFeature(splitOnFeature);
                 children = new Node[splits.length];
                 for (int i = 0; i < splits.length; i++)
                 {
                     children[i] = new Node(splits[i]);
+                    children[i].parent = this;
                     children[i].address = this.address + "->" + i;
-//                    children[i].train(parent, i);
                     children[i].train();
                 }
             }
             else
             {
                 endNode = true;
+                prunableNodes.add(this.parent);
             }
         }
 
         public double predict(double[] features)
         {
-//            System.out.println(address);
-            if (!endNode)
+            if (!endNode || isPruned)
             {
                 double nominalValue = features[splitOnFeature];
                 features = removeFeature(features, splitOnFeature);
-//                System.out.println("Nom: " + nominalValue);
-//                System.out.println(entrySet.featureCounts(0)[0]);
-//                System.out.println(children.length);
                 if (nominalValue >= children.length)
                 {
                     nominalValue = Math.abs(rand.nextInt()) % children.length;
@@ -233,6 +313,18 @@ public class DecisionTree extends SupervisedLearner
             }
 
             return entrySet.targets.mostCommonValue(0);
+        }
+
+        public void unPrune()
+        {
+            isPruned = false;
+            if (children != null)
+            {
+                for (Node child : children)
+                {
+                    child.unPrune();
+                }
+            }
         }
 
         public void printTree()
@@ -267,7 +359,7 @@ public class DecisionTree extends SupervisedLearner
         private double[] removeFeature(double[] input, int col)
         {
             double[] newFeatures = new double[input.length - 1];
-            for(int i = 0; i < input.length - 1; i++)
+            for (int i = 0; i < input.length - 1; i++)
             {
                 if (i < col)
                 {
