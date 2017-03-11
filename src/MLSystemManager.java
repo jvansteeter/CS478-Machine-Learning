@@ -179,9 +179,11 @@ public class MLSystemManager {
 			System.out.println("Number of folds: " + folds);
 			fileWriter.write(fileName + "\n");
 			((DecisionTree)learner).setPrune(false);
-//			fileWriter.write("train accuracy,test accuracy\n");
+			fileWriter.write("train accuracy,test accuracy\n");
 			int reps = 1;
 			double sumAccuracy = 0.0;
+			int sumNodeCount = 0;
+			int sumDepth = 0;
 			double elapsedTime = 0.0;
 			for(int j = 0; j < reps; j++) {
 				data.shuffle(rand);
@@ -200,19 +202,21 @@ public class MLSystemManager {
 					double trainAccuracy = learner.measureAccuracy(trainFeatures, trainLabels, null);
 					double accuracy = learner.measureAccuracy(testFeatures, testLabels, null);
 					sumAccuracy += accuracy;
+					sumNodeCount += ((DecisionTree)learner).nodeCount();
+					sumDepth += ((DecisionTree)learner).depth();
 					System.out.println("Rep=" + j + ", Fold=" + i + ", Train Accuracy=" + trainAccuracy);
 					System.out.println("Rep=" + j + ", Fold=" + i + ", Test Accuracy=" + accuracy);
-//					fileWriter.write(trainAccuracy + "," + accuracy + "\n");
+					fileWriter.write(trainAccuracy + "," + accuracy + "\n");
 				}
 			}
 			elapsedTime /= (reps * folds);
 			System.out.println("Average time to train (in seconds): " + elapsedTime / 1000.0);
 			System.out.println("Mean accuracy=" + (sumAccuracy / (reps * folds)));
-//			fileWriter.write("Average\n" + (sumAccuracy / (reps * folds)));
-			fileWriter.write("Pruned," + ((DecisionTree)learner).isPrune() + "\n");
-			fileWriter.write("# of nodes," + ((DecisionTree)learner).nodeCount() + "\n");
-			fileWriter.write("Tree depth," + ((DecisionTree)learner).depth() + "\n");
-			fileWriter.write("Average," + (sumAccuracy / (reps * folds)) + "\n");
+			fileWriter.write("Average\n" + (sumAccuracy / (reps * folds)));
+//			fileWriter.write("Pruned," + ((DecisionTree)learner).isPrune() + "\n");
+//			fileWriter.write("# of nodes," + (sumNodeCount / (reps * folds)) + "\n");
+//			fileWriter.write("Tree depth," + (sumDepth / (reps * folds)) + "\n");
+//			fileWriter.write("Accuracy," + (sumAccuracy / (reps * folds)) + "\n");
 		}
 		fileWriter.close();
 	}

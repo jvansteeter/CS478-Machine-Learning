@@ -7,6 +7,7 @@ public class DecisionTree extends SupervisedLearner
     private Random rand;
     private HashSet<Node> prunableNodes;
     private boolean prune;
+    private int deepest;
 
     public DecisionTree(Random rand)
     {
@@ -24,7 +25,6 @@ public class DecisionTree extends SupervisedLearner
             head = new Node(entrySet);
             head.address = "head";
             head.train();
-//            head.printTree();
         }
         else
         {
@@ -36,11 +36,10 @@ public class DecisionTree extends SupervisedLearner
             Matrix validationFeatures = new Matrix(features, trainingSetSize, 0, features.rows() - trainingSetSize, features.cols());
             Matrix validationTargets = new Matrix(targets, trainingSetSize, 0, features.rows() - trainingSetSize, 1);
 
-            EntrySet entrySet = new EntrySet(trainingFeatures, trainingTargets);
+            EntrySet entrySet = new EntrySet(trainingFeatures, trainingTargets, true);
             head = new Node(entrySet);
             head.address = "head";
             head.train();
-//            head.printTree();
 
             // begin the super obnoxious process of error pruning
             double originalAccuracy = this.measureAccuracy(validationFeatures, validationTargets, null);
@@ -120,8 +119,20 @@ public class DecisionTree extends SupervisedLearner
 
     public int depth()
     {
-        return head.getDepth();
+        return deepest;
     }
+
+    private void deepest(int depth)
+    {
+        if (depth > deepest)
+        {
+            deepest = depth;
+        }
+    }
+
+////////////////////////////////////////////////////////////////////////
+//                ENTRY SET
+////////////////////////////////////////////////////////////////////////
 
     private class EntrySet extends Matrix
     {
@@ -141,6 +152,74 @@ public class DecisionTree extends SupervisedLearner
                     {
                         value = max + 1;
                     }
+                    set(row, col, value);
+                }
+            }
+        }
+
+        public EntrySet(Matrix matrix, Matrix targets, boolean smart)
+        {
+            this.targets = targets;
+            Matrix result = new Matrix();
+            result.setSize(matrix.rows(), matrix.cols());
+            for (int row = 0; row < matrix.rows(); row++)
+            {
+                for (int col = 0; col < matrix.cols(); col++)
+                {
+                    double value = matrix.get(row, col);
+                    result.set(row, col, value);
+                }
+            }
+
+            boolean unknownsRemain = true;
+            while (unknownsRemain)
+            {
+                Matrix original = copy(result);
+                unknownsRemain = false;
+                for (int col = 0; col < result.cols(); col++)
+                {
+                    if (colHasUnknown(col, original))
+                    {
+                        unknownsRemain = true;
+                        Matrix column = getCol(col, original);
+                        Matrix dataTargets = replaceCol(col, original, targets);
+                        Matrix[] pieces = divideByKnown(dataTargets, column);
+                        Matrix trainingFeatures = pieces[0];
+                        Matrix trainingTargets = pieces[1];
+                        Matrix unknownFeatures = pieces[2];
+                        Matrix unknownTargets = pieces[3];
+
+                        EntrySet entrySet = new EntrySet(trainingFeatures, trainingTargets);
+                        Node tempHead = new Node(entrySet);
+                        tempHead.train();
+                        // find the new values
+                        Matrix newFeatures = new Matrix();
+                        newFeatures.setSize(unknownTargets.rows(), 1);
+                        for (int row = 0; row < unknownFeatures.rows(); row++)
+                        {
+                            double[] features = unknownFeatures.row(row);
+                            double[] columnMaxes = tempHead.entrySet.getColumnMaxes();
+                            for (int i = 0; i < features.length; i++)
+                            {
+                                if (features[i] > columnMaxes[i])
+                                {
+                                    features[i] = columnMaxes[i];
+                                }
+                            }
+                            newFeatures.set(row, 0, tempHead.predict(features));
+                        }
+                        Matrix results = recombine(trainingTargets, newFeatures);
+                        result = replaceCol(col, result, results);
+                    }
+                }
+            }
+
+            this.setSize(result.rows(), result.cols());
+            for (int row = 0; row < result.rows(); row++)
+            {
+                for (int col = 0; col < result.cols(); col++)
+                {
+                    double value = result.get(row, col);
                     set(row, col, value);
                 }
             }
@@ -276,7 +355,131 @@ public class DecisionTree extends SupervisedLearner
 
             return maxes;
         }
+
+        public boolean colHasUnknown(int col, Matrix matrix)
+        {
+            for (int i = 0; i < matrix.rows(); i++)
+            {
+                if (matrix.get(i, col) == Double.MAX_VALUE)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public Matrix copy(Matrix original)
+        {
+            Matrix newMatrix = new Matrix();
+            newMatrix.setSize(original.rows(), original.cols());
+            for (int row = 0; row < original.rows(); row++)
+            {
+                for (int col = 0; col < original.cols(); col++)
+                {
+                    double value = original.get(row, col);
+                    newMatrix.set(row, col, value);
+                }
+            }
+
+            return newMatrix;
+        }
+
+        private Matrix getCol(int col, Matrix matrix)
+        {
+            Matrix column = new Matrix();
+            column.setSize(matrix.rows(), 1);
+            for (int i = 0; i < matrix.rows(); i++)
+            {
+                column.set(i, 0, matrix.get(i, col));
+            }
+
+            return column;
+        }
+
+        private Matrix[] divideByKnown(Matrix features, Matrix targets)
+        {
+            int unknownCount = 0;
+            for (int i = 0; i < targets.rows(); i++)
+            {
+                if (targets.get(i, 0) == Double.MAX_VALUE)
+                {
+                    unknownCount++;
+                }
+            }
+
+            Matrix trainingFeatures = new Matrix();
+            Matrix trainingTargets = new Matrix();
+            Matrix unknownFeatures = new Matrix();
+            Matrix unknownTargets = new Matrix();
+            trainingFeatures.setSize(targets.rows() - unknownCount, features.cols());
+            trainingTargets.setSize(targets.rows() - unknownCount, 1);
+            unknownFeatures.setSize(unknownCount, features.cols());
+            unknownTargets.setSize(unknownCount, 1);
+            int trainingIndex = 0;
+            int unknownIndex = 0;
+            for (int row = 0; row < targets.rows(); row++)
+            {
+                // if this target is unknown
+                if (targets.get(row, 0) == Double.MAX_VALUE)
+                {
+                    unknownTargets.set(unknownIndex, 0, targets.get(row, 0));
+                    for (int col = 0; col < features.cols(); col++)
+                    {
+                        unknownFeatures.set(unknownIndex, col, features.get(row, col));
+                    }
+                    unknownIndex++;
+                }
+                else
+                {
+                    trainingTargets.set(trainingIndex, 0, targets.get(row, 0));
+                    for (int col = 0; col < features.cols(); col++)
+                    {
+                        trainingFeatures.set(trainingIndex, col, features.get(row, col));
+                    }
+                    trainingIndex++;
+                }
+            }
+            Matrix[] result = new Matrix[4];
+            result[0] = trainingFeatures;
+            result[1] = trainingTargets;
+            result[2] = unknownFeatures;
+            result[3] = unknownTargets;
+
+            return result;
+        }
+
+        private Matrix replaceCol(int col, Matrix original, Matrix replacement)
+        {
+            Matrix result = copy(original);
+            for (int i = 0; i < result.rows(); i++)
+            {
+                result.set(i, col, replacement.get(i, 0));
+            }
+
+            return result;
+        }
+
+        private Matrix recombine(Matrix trainingTargets, Matrix unknownTargets)
+        {
+            Matrix combinedTargets = new Matrix();
+            combinedTargets.setSize(trainingTargets.rows() + unknownTargets.rows(), 1);
+            for (int row = 0; row < trainingTargets.rows(); row++)
+            {
+                combinedTargets.set(row, 0, trainingTargets.get(row, 0));
+            }
+            for (int row = 0; row < unknownTargets.rows(); row++)
+            {
+                combinedTargets.set(trainingTargets.rows() + row, 0, unknownTargets.get(row, 0));
+            }
+
+            return combinedTargets;
+        }
     }
+
+////////////////////////////////////////////////////////////////////////
+//                NODE
+////////////////////////////////////////////////////////////////////////
 
     private class Node
     {
@@ -325,7 +528,7 @@ public class DecisionTree extends SupervisedLearner
                     children[i] = new Node(splits[i]);
                     children[i].parent = this;
                     children[i].address = this.address + "->" + i;
-                    children[i].depth = this.depth + 1;
+                    children[i].setDepth(this.depth + 1);
                     children[i].train();
                 }
             }
@@ -352,34 +555,18 @@ public class DecisionTree extends SupervisedLearner
             return entrySet.targets.mostCommonValue(0);
         }
 
-        public int getDepth()
-        {
-            if (isPruned)
-            {
-                return 0;
-            }
-            if (children != null)
-            {
-                int deepest = 0;
-                for (Node child : children)
-                {
-                    if (child.getDepth() > deepest)
-                    {
-                        deepest = child.getDepth();
-                    }
-                }
-                return deepest;
-            }
-
-            return depth;
-        }
-
         public int nodeCount()
         {
             int[] count = {1};
             nodeCount(count);
 
             return count[0];
+        }
+
+        private void setDepth(int depth)
+        {
+            this.depth = depth;
+            deepest(depth);
         }
 
         private void nodeCount(int[] count)
