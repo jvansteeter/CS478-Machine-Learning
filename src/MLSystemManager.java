@@ -74,6 +74,8 @@ public class MLSystemManager {
 		System.out.println("Evaluation method: " + evalMethod);
 		System.out.println();
 
+		((InstanceBasedLearner)learner).setRegression(true);
+
 		if (evalMethod.equals("training"))
 		{
 			System.out.println("Calculating accuracy on training set...");
@@ -113,8 +115,19 @@ public class MLSystemManager {
 			Matrix testFeatures = new Matrix(testData, 0, 0, testData.rows(), testData.cols() - 1);
 			Matrix testLabels = new Matrix(testData, 0, testData.cols() - 1, testData.rows(), 1);
 			Matrix confusion = new Matrix();
-			double testAccuracy = learner.measureAccuracy(testFeatures, testLabels, confusion);
-			System.out.println("Test set accuracy: " + testAccuracy);
+//			double testAccuracy = learner.measureAccuracy(testFeatures, testLabels, confusion);
+//			System.out.println("Test set accuracy: " + testAccuracy);
+			double mse = 0;
+			for (int i = 0; i < testFeatures.rows(); i++)
+			{
+				double target = testLabels.row(i)[0];
+				double[] prediction = {0.0};
+				learner.predict(testFeatures.row(i), prediction);
+				mse += Math.pow(target - prediction[0], 2);
+			}
+			mse = mse / testFeatures.rows();
+			System.out.println("K-Nearest Neighbors: " + ((InstanceBasedLearner)learner).getkNeighbors());
+			System.out.println("MSE: " + mse);
 			if(printConfusionMatrix) {
 				System.out.println("\nConfusion matrix: (Row=target value, Col=predicted value)");
 				confusion.print();

@@ -1,3 +1,4 @@
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -7,10 +8,14 @@ public class InstanceBasedLearner extends SupervisedLearner
 {
     private int kNeighbors;
     private NeighborSet neighbors;
+    private boolean regression;
+
+    private Writer fileWriter;
 
     public InstanceBasedLearner()
     {
         kNeighbors = 3;
+        regression = false;
     }
 
     @Override
@@ -31,6 +36,26 @@ public class InstanceBasedLearner extends SupervisedLearner
         double vote = neighbors.vote(directory.nn());
 
         labels[0] = vote;
+    }
+
+    public int getkNeighbors()
+    {
+        return kNeighbors;
+    }
+
+    public void setkNeighbors(int kNeighbors)
+    {
+        this.kNeighbors = kNeighbors;
+    }
+
+    public void setFileWriter(Writer fileWriter)
+    {
+        this.fileWriter = fileWriter;
+    }
+
+    public void setRegression(boolean regression)
+    {
+        this.regression = regression;
     }
 
     private double distance(double[] one, double[] two)
@@ -57,9 +82,11 @@ public class InstanceBasedLearner extends SupervisedLearner
         private double vote(List<Integer> neighbors)
         {
             HashMap<Double, Integer> votes = new HashMap<>();
+            double regressionVote = 0;
             for (Integer neighbor : neighbors)
             {
                 double vote = targets.row(neighbor)[0];
+                regressionVote += vote;
                 if (votes.containsKey(vote))
                 {
                     votes.replace(vote, votes.get(vote) + 1);
@@ -69,6 +96,7 @@ public class InstanceBasedLearner extends SupervisedLearner
                     votes.put(vote, 1);
                 }
             }
+            regressionVote = regressionVote / neighbors.size();
             double vote = -1.0;
             for (Map.Entry<Double, Integer> entry : votes.entrySet())
             {
@@ -85,6 +113,10 @@ public class InstanceBasedLearner extends SupervisedLearner
                 }
             }
 
+            if (regression)
+            {
+                return regressionVote;
+            }
             return vote;
         }
     }
