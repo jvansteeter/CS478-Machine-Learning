@@ -20,7 +20,7 @@ public class MLSystemManager {
 		 else if (model.equals("perceptron")) return new Perceptron(rand);
 		 else if (model.equals("neuralnet")) return new NeuralNet(rand);
 		 else if (model.equals("decisiontree")) return new DecisionTree(rand);
-		 else if (model.equals("knn")) return new InstanceBasedLearner();
+		 else if (model.equals("knn")) return new InstanceBasedLearner(rand);
 		else throw new Exception("Unrecognized model: " + model);
 	}
 
@@ -28,8 +28,8 @@ public class MLSystemManager {
 
 		//args = new String[]{"-L", "baseline", "-A", "data/iris.arff", "-E", "cross", "10", "-N"};
 
-		//Random rand = new Random(1234); // Use a seed for deterministic results (makes debugging easier)
-		Random rand = new Random(); // No seed for non-deterministic results
+		Random rand = new Random(1234); // Use a seed for deterministic results (makes debugging easier)
+//		Random rand = new Random(); // No seed for non-deterministic results
 
 		//Parse the command line arguments
 		ArgParser parser = new ArgParser(args);
@@ -74,7 +74,7 @@ public class MLSystemManager {
 		System.out.println("Evaluation method: " + evalMethod);
 		System.out.println();
 
-		((InstanceBasedLearner)learner).setRegression(true);
+//		((InstanceBasedLearner)learner).setRegression(true);
 
 		if (evalMethod.equals("training"))
 		{
@@ -106,32 +106,40 @@ public class MLSystemManager {
 			System.out.println("Number of test instances: " + testData.rows());
 			Matrix features = new Matrix(data, 0, 0, data.rows(), data.cols() - 1);
 			Matrix labels = new Matrix(data, 0, data.cols() - 1, data.rows(), 1);
-			double startTime = System.currentTimeMillis();
-			learner.train(features, labels);
-			double elapsedTime = System.currentTimeMillis() - startTime;
-			System.out.println("Time to train (in seconds): " + elapsedTime / 1000.0);
-			double trainAccuracy = learner.measureAccuracy(features, labels, null);
-			System.out.println("Training set accuracy: " + trainAccuracy);
-			Matrix testFeatures = new Matrix(testData, 0, 0, testData.rows(), testData.cols() - 1);
-			Matrix testLabels = new Matrix(testData, 0, testData.cols() - 1, testData.rows(), 1);
-			Matrix confusion = new Matrix();
-//			double testAccuracy = learner.measureAccuracy(testFeatures, testLabels, confusion);
-//			System.out.println("Test set accuracy: " + testAccuracy);
-			double mse = 0;
-			for (int i = 0; i < testFeatures.rows(); i++)
+			for (int i = 1; i < 15; i += 2)
 			{
-				double target = testLabels.row(i)[0];
-				double[] prediction = {0.0};
-				learner.predict(testFeatures.row(i), prediction);
-				mse += Math.pow(target - prediction[0], 2);
-			}
-			mse = mse / testFeatures.rows();
-			System.out.println("K-Nearest Neighbors: " + ((InstanceBasedLearner)learner).getkNeighbors());
-			System.out.println("MSE: " + mse);
-			if(printConfusionMatrix) {
-				System.out.println("\nConfusion matrix: (Row=target value, Col=predicted value)");
-				confusion.print();
-				System.out.println("\n");
+				double startTime = System.currentTimeMillis();
+				((InstanceBasedLearner)learner).setkNeighbors(i);
+				learner.train(features, labels);
+				double elapsedTime = System.currentTimeMillis() - startTime;
+				System.out.println("Time to train (in seconds): " + elapsedTime / 1000.0);
+//				double trainAccuracy = learner.measureAccuracy(features, labels, null);
+//				System.out.println("Training set accuracy: " + trainAccuracy);
+				Matrix testFeatures = new Matrix(testData, 0, 0, testData.rows(), testData.cols() - 1);
+				Matrix testLabels = new Matrix(testData, 0, testData.cols() - 1, testData.rows(), 1);
+				Matrix confusion = new Matrix();
+
+//				double mse = 0;
+//				for (int j = 0; j < testFeatures.rows(); j++)
+//				{
+//					double target = testLabels.row(j)[0];
+//					double[] prediction = {0.0};
+//					learner.predict(testFeatures.row(j), prediction);
+//					mse += Math.pow(target - prediction[0], 2);
+//				}
+//				mse = mse / testFeatures.rows();
+//				System.out.println("K-Nearest Neighbors: " + ((InstanceBasedLearner)learner).getkNeighbors());
+//				System.out.println("MSE: " + mse);
+//				fileWriter.write(((InstanceBasedLearner)learner).getkNeighbors() + "," + mse + "\n");
+				double testAccuracy = learner.measureAccuracy(testFeatures, testLabels, confusion);
+				System.out.println("K neighbors: " + ((InstanceBasedLearner)learner).getkNeighbors());
+				System.out.println("Test set accuracy: " + testAccuracy);
+				fileWriter.write(((InstanceBasedLearner)learner).getkNeighbors() + "," + testAccuracy + "\n");
+				if(printConfusionMatrix) {
+					System.out.println("\nConfusion matrix: (Row=target value, Col=predicted value)");
+					confusion.print();
+					System.out.println("\n");
+				}
 			}
 		}
 		else if (evalMethod.equals("random"))
