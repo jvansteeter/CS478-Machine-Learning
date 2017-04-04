@@ -42,14 +42,7 @@ public class ClusteringManager {
             data.normalize();
         }
 
-        // create file for result storing
-        File outputFile = new File("results.csv");
-        if (outputFile.exists())
-        {
-            outputFile.delete();
-        }
-        outputFile.createNewFile();
-        Writer fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
+
 //		fileWriter.write("Layers,Epoch,Training MSE,VS Accuracy,VS MSE,Test Accuracy,Test MSE\n");
 
         // Print some stats

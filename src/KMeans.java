@@ -1,3 +1,4 @@
+import java.io.*;
 import java.util.*;
 
 public class KMeans
@@ -5,6 +6,7 @@ public class KMeans
     private Random rand;
     private int k = 4;
     private boolean[] nominals;
+    private Writer fileWriter;
 
     public KMeans(Random rand)
     {
@@ -13,6 +15,15 @@ public class KMeans
 
     public void run(Matrix features) throws Exception
     {
+        // create file for result storing
+        File outputFile = new File("results.csv");
+        if (outputFile.exists())
+        {
+            outputFile.delete();
+        }
+        outputFile.createNewFile();
+        fileWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputFile), "utf-8"));
+
         nominals = new boolean[features.cols()];
         for (int i = 0; i < features.cols(); i++)
         {
@@ -69,7 +80,7 @@ public class KMeans
             centroidMembers = new ArrayList<>();
             distances = new ArrayList<>();
 
-            centroids = new double[k][];
+            centroids = new double[this.k][];
             for (int i = 0; i < k; i++)
             {
                 centroids[i] = data.row(i).clone();
@@ -80,7 +91,7 @@ public class KMeans
             }
         }
 
-        private void iterate()
+        private void assignToCentroid()
         {
             for (int i = 0; i < data.rows(); i++)
             {
@@ -97,8 +108,53 @@ public class KMeans
                         closestDistance = centroidDistance;
                     }
                 }
-                assign(i,-=);
+                assign(i,closestCentroid);
             }
+        }
+
+        private void outputIteration() throws IOException
+        {
+            fileWriter.write("***************\n");
+            fileWriter.write("Iteration 1\n");
+            fileWriter.write("***************\n");
+            fileWriter.write("Computing Centroids:\n");
+            StringBuilder line = new StringBuilder();
+
+            for (int i = 0; i < centroids.length; i++)
+            {
+                line.append("Centroid " + i + " =");
+                for (int j = 0; j < data.cols(); j++)
+                {
+                    if (centroids[i][j] == Double.MAX_VALUE)
+                    {
+                        line.append(" ?,");
+                    }
+                    else
+                    {
+                        if (nominals[j])
+                        {
+                            line.append(" " + data.m_enum_to_str.get(j).get(centroids[i][j]) + ",");
+                        }
+                        else
+                        {
+                            line.append(" " + centroids[i][j] + ",");
+                        }
+                    }
+                }
+                fileWriter.write(line.toString());
+            }
+            line.setLength(0);
+            fileWriter.write("Making Assignments");
+            for (int i = 0; i < assignments.size(); i++)
+            {
+                line.append(i + "=" + assignments.get(i) + "\t");
+                if ((i + 1) % 10 == 0)
+                {
+                    line.append("\n");
+                }
+            }
+            fileWriter.write(line.toString());
+            fileWriter.write("SSE: ****");
         }
 
         private void assign(int node, int centroid)
