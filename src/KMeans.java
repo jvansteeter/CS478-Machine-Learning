@@ -1,16 +1,21 @@
 import java.io.*;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class KMeans
 {
     private Random rand;
-    private int k = 4;
+    private int k = 5;
     private boolean[] nominals;
+    private DecimalFormat rounder;
     private Writer fileWriter;
 
     public KMeans(Random rand)
     {
         this.rand = rand;
+        rounder = new DecimalFormat("0.000");
+        rounder.setRoundingMode(RoundingMode.HALF_EVEN);
     }
 
     public void run(Matrix features) throws Exception
@@ -31,11 +36,24 @@ public class KMeans
         }
 
         CentroidMap map = new CentroidMap(k, features);
-        double[][] centroids = map.getCentroids();
-        while (true)
+        double lastIterationSSE = 0.0;
+        boolean changing = true;
+        while (changing)
         {
+            map.makeAssignments();
+            map.outputIteration();
+            map.calcNewCentroids();
 
+            changing = false;
+            double nextIterationSSE = map.sumSquaredError();
+            if (lastIterationSSE != nextIterationSSE)
+            {
+                lastIterationSSE = nextIterationSSE;
+                changing = true;
+            }
         }
+
+        fileWriter.close();
     }
 
 
@@ -66,6 +84,7 @@ public class KMeans
     private class CentroidMap
     {
         private int k;
+        private int iteration;
         private double[][] centroids;
         private Matrix data;
         private HashMap<Integer, Integer> assignments;
@@ -75,6 +94,7 @@ public class KMeans
         private CentroidMap(int k, Matrix data)
         {
             this.k = k;
+            this.iteration = 1;
             this.data = data;
             assignments = new HashMap<>();
             centroidMembers = new ArrayList<>();
@@ -89,10 +109,19 @@ public class KMeans
             {
                 centroidMembers.add(new TreeSet<>());
             }
+            for (int i = 0; i < data.rows(); i++)
+            {
+                distances.add(new ArrayList<>());
+            }
         }
 
-        private void assignToCentroid()
+        private boolean makeAssignments()
         {
+            if (iteration > 1)
+            {
+                clear();
+            }
+            boolean change = false;
             for (int i = 0; i < data.rows(); i++)
             {
                 double[] node = data.row(i);
@@ -108,14 +137,87 @@ public class KMeans
                         closestDistance = centroidDistance;
                     }
                 }
-                assign(i,closestCentroid);
+                boolean result = assign(i, closestCentroid);
+                change = (change || result);
+            }
+
+//            System.out.println("Returning " + change);
+            return change;
+        }
+
+        private void calcNewCentroids()
+        {
+            iteration++;
+            for (int centroid = 0; centroid < k; centroid++)
+            {
+                for (int feature = 0; feature < data.cols(); feature++)
+                {
+                    if (nominals[feature])
+                    {
+                        HashMap<Double, Integer> counts = new HashMap<>();
+                        for (int member : centroidMembers.get(centroid))
+                        {
+                            double nominalValue = data.row(member)[feature];
+                            if (nominalValue != Double.MAX_VALUE)
+                            {
+                                if (counts.containsKey(nominalValue))
+                                {
+                                    counts.put(nominalValue, counts.get(nominalValue) + 1);
+                                }
+                                else
+                                {
+                                    counts.put(nominalValue, 1);
+                                }
+                            }
+                        }
+                        int greatestCount = -1;
+                        double mostCommonNominalValue = -1.0;
+                        for (Map.Entry<Double, Integer> entry : counts.entrySet())
+                        {
+                            if (entry.getValue() > greatestCount || (entry.getValue() == greatestCount && entry.getKey() < mostCommonNominalValue))
+                            {
+                                greatestCount = entry.getValue();
+                                mostCommonNominalValue = entry.getKey();
+                            }
+                        }
+                        centroids[centroid][feature] = mostCommonNominalValue;
+                    }
+                    else
+                    {
+                        double sum = 0.0;
+                        int count = 0;
+                        for (int member : centroidMembers.get(centroid))
+                        {
+                            double realValue = data.row(member)[feature];
+                            if (realValue == Double.MAX_VALUE)
+                            {
+                                sum += 0;
+                            }
+                            else
+                            {
+                                sum += realValue;
+                                count++;
+                            }
+                        }
+                        double result;
+                        if (count > 0)
+                        {
+                            result = sum / count;
+                        }
+                        else
+                        {
+                            result = Double.MAX_VALUE;
+                        }
+                        centroids[centroid][feature] = result;
+                    }
+                }
             }
         }
 
         private void outputIteration() throws IOException
         {
             fileWriter.write("***************\n");
-            fileWriter.write("Iteration 1\n");
+            fileWriter.write("Iteration " + iteration + "\n");
             fileWriter.write("***************\n");
             fileWriter.write("Computing Centroids:\n");
             StringBuilder line = new StringBuilder();
@@ -125,47 +227,98 @@ public class KMeans
                 line.append("Centroid " + i + " =");
                 for (int j = 0; j < data.cols(); j++)
                 {
-                    if (centroids[i][j] == Double.MAX_VALUE)
+                    if (nominals[j])
                     {
-                        line.append(" ?,");
-                    }
-                    else
-                    {
-                        if (nominals[j])
+                        if (centroids[i][j] == Double.MAX_VALUE)
                         {
-                            line.append(" " + data.m_enum_to_str.get(j).get(centroids[i][j]) + ",");
+                            line.append(" ?,");
                         }
                         else
                         {
-                            line.append(" " + centroids[i][j] + ",");
+                            line.append(" " + data.m_enum_to_str.get(j).get(((int) centroids[i][j])) + ",");
+                        }
+                    }
+                    else
+                    {
+                        if (centroids[i][j] == Double.MAX_VALUE)
+                        {
+                            line.append(" ?,");
+                        }
+                        else
+                        {
+                            line.append(" " + rounder.format(centroids[i][j]) + ",");
                         }
                     }
                 }
+                line.append("\n");
                 fileWriter.write(line.toString());
+                line.setLength(0);
             }
-            line.setLength(0);
-            fileWriter.write("Making Assignments");
+            fileWriter.write("Making Assignments\n");
             for (int i = 0; i < assignments.size(); i++)
             {
-                line.append(i + "=" + assignments.get(i) + "\t");
+                line.append("\t" + i + "=" + assignments.get(i) + " ");
                 if ((i + 1) % 10 == 0)
                 {
                     line.append("\n");
                 }
             }
+            line.append("\n");
             fileWriter.write(line.toString());
-            fileWriter.write("SSE: ****");
+            fileWriter.write("SSE: " + rounder.format(sumSquaredError()) + "\n\n");
         }
 
-        private void assign(int node, int centroid)
+        private boolean assign(int node, int centroid)
         {
-            assignments.put(node,centroid);
+            boolean change = false;
+            if (!assignments.containsKey(node) || assignments.get(node) != centroid)
+            {
+                assignments.put(node, centroid);
+                change = true;
+            }
+            else
+            {
+//                assignments.put(node, centroid);
+            }
             centroidMembers.get(centroid).add(node);
+
+//            System.out.println("assign: " + change);
+            return change;
+        }
+
+        private double sumSquaredError()
+        {
+            double sum = 0.0;
+            for (int i = 0; i < centroids.length; i++)
+            {
+                sum += sumSquaredError(i);
+            }
+
+            return sum;
+        }
+
+        private double sumSquaredError(int centroid)
+        {
+            double sum = 0.0;
+            TreeSet<Integer> members = centroidMembers.get(centroid);
+            for (int member : members)
+            {
+                int assignedTo = assignments.get(member);
+                sum += Math.pow(distances.get(member).get(assignedTo), 2);
+            }
+
+            return sum;
         }
 
         private double[][] getCentroids()
         {
             return centroids;
+        }
+
+        private void clear()
+        {
+            centroidMembers.forEach((TreeSet<Integer> element) -> element.clear());
+            distances.forEach((ArrayList<Double> element) -> element.clear());
         }
     }
 }
