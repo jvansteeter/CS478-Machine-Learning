@@ -5,8 +5,8 @@ import java.util.*;
 
 public class KMeans
 {
+    private int k = 4;
     private Random rand;
-    private int k = 5;
     private boolean[] nominals;
     private DecimalFormat rounder;
     private Writer fileWriter;
@@ -53,9 +53,19 @@ public class KMeans
             }
         }
 
+        System.out.println("Number of clusters: " + k);
+        for (int i = 0; i < k; i++)
+        {
+            System.out.println(map.centroidInfo(i));
+        }
+        for (int i = 0; i < k; i++)
+        {
+            System.out.println("Cluster " + i + ": Instances-" + map.centroidMembers.get(i).size() + "\tSSE-" + rounder.format(map.sumSquaredError(i)) + "\tMSE-" + rounder.format(map.meanSquaredError(i)));
+        }
+        System.out.println("Total SSE: " + rounder.format(map.sumSquaredError()));
+
         fileWriter.close();
     }
-
 
     private double distance(double[] one, double[] two)
     {
@@ -100,11 +110,18 @@ public class KMeans
             centroidMembers = new ArrayList<>();
             distances = new ArrayList<>();
 
+//            centroids = new double[this.k][];
+//            for (int i = 0; i < k; i++)
+//            {
+//                centroids[i] = data.row(i).clone();
+//            }
             centroids = new double[this.k][];
             for (int i = 0; i < k; i++)
             {
-                centroids[i] = data.row(i).clone();
+                int randomIndex = rand.nextInt() % data.rows();
+                centroids[i] = data.row(randomIndex).clone();
             }
+
             for (int i = 0; i < centroids.length; i++)
             {
                 centroidMembers.add(new TreeSet<>());
@@ -141,7 +158,6 @@ public class KMeans
                 change = (change || result);
             }
 
-//            System.out.println("Returning " + change);
             return change;
         }
 
@@ -224,32 +240,33 @@ public class KMeans
 
             for (int i = 0; i < centroids.length; i++)
             {
-                line.append("Centroid " + i + " =");
-                for (int j = 0; j < data.cols(); j++)
-                {
-                    if (nominals[j])
-                    {
-                        if (centroids[i][j] == Double.MAX_VALUE)
-                        {
-                            line.append(" ?,");
-                        }
-                        else
-                        {
-                            line.append(" " + data.m_enum_to_str.get(j).get(((int) centroids[i][j])) + ",");
-                        }
-                    }
-                    else
-                    {
-                        if (centroids[i][j] == Double.MAX_VALUE)
-                        {
-                            line.append(" ?,");
-                        }
-                        else
-                        {
-                            line.append(" " + rounder.format(centroids[i][j]) + ",");
-                        }
-                    }
-                }
+//                line.append("Centroid " + i + " =");
+//                for (int j = 0; j < data.cols(); j++)
+//                {
+//                    if (nominals[j])
+//                    {
+//                        if (centroids[i][j] == Double.MAX_VALUE)
+//                        {
+//                            line.append(" ?,");
+//                        }
+//                        else
+//                        {
+//                            line.append(" " + data.m_enum_to_str.get(j).get(((int) centroids[i][j])) + ",");
+//                        }
+//                    }
+//                    else
+//                    {
+//                        if (centroids[i][j] == Double.MAX_VALUE)
+//                        {
+//                            line.append(" ?,");
+//                        }
+//                        else
+//                        {
+//                            line.append(" " + rounder.format(centroids[i][j]) + ",");
+//                        }
+//                    }
+//                }
+                line.append(centroidInfo(i));
                 line.append("\n");
                 fileWriter.write(line.toString());
                 line.setLength(0);
@@ -266,6 +283,43 @@ public class KMeans
             line.append("\n");
             fileWriter.write(line.toString());
             fileWriter.write("SSE: " + rounder.format(sumSquaredError()) + "\n\n");
+        }
+
+        private String centroidInfo(int centoid)
+        {
+            StringBuilder line = new StringBuilder();
+            line.append("Centroid " + centoid + " =");
+            for (int j = 0; j < data.cols(); j++)
+            {
+                if (nominals[j])
+                {
+                    if (centroids[centoid][j] == Double.MAX_VALUE)
+                    {
+                        line.append(" ?");
+                    }
+                    else
+                    {
+                        line.append(" " + data.m_enum_to_str.get(j).get(((int) centroids[centoid][j])));
+                    }
+                }
+                else
+                {
+                    if (centroids[centoid][j] == Double.MAX_VALUE)
+                    {
+                        line.append(" ?");
+                    }
+                    else
+                    {
+                        line.append(" " + rounder.format(centroids[centoid][j]));
+                    }
+                }
+                if (j + 1 < data.cols())
+                {
+                    line.append(",");
+                }
+            }
+
+            return line.toString();
         }
 
         private boolean assign(int node, int centroid)
@@ -308,6 +362,11 @@ public class KMeans
             }
 
             return sum;
+        }
+
+        private double meanSquaredError(int centroid)
+        {
+            return sumSquaredError(centroid) / centroidMembers.get(centroid).size();
         }
 
         private double[][] getCentroids()
