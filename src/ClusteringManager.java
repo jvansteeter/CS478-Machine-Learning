@@ -1,12 +1,7 @@
-// ----------------------------------------------------------------
-// The contents of this file are distributed under the CC0 license.
-// See http://creativecommons.org/publicdomain/zero/1.0/
-// ----------------------------------------------------------------
-
-
-import java.io.*;
-import java.util.ArrayList;
 import java.util.Random;
+import java.util.TreeMap;
+
+import static java.lang.Double.NaN;
 
 
 public class ClusteringManager
@@ -17,7 +12,7 @@ public class ClusteringManager
 
         //args = new String[]{"-L", "baseline", "-A", "data/iris.arff", "-E", "cross", "10", "-N"};
 
-        Random rand = new Random(1234); // Use a seed for deterministic results (makes debugging easier)
+        Random rand = new Random(); // Use a seed for deterministic results (makes debugging easier)
 //		Random rand = new Random(); // No seed for non-deterministic results
 
         //Parse the command line arguments
@@ -53,22 +48,17 @@ public class ClusteringManager
 
 
         System.out.println("Calculating accuracy on training set...");
-        learner.run(data);
-//        Matrix features = new Matrix(data, 0, 0, data.rows(), data.cols() - 1);
-//        Matrix labels = new Matrix(data, 0, data.cols() - 1, data.rows(), 1);
-//        Matrix confusion = new Matrix();
-//        double startTime = System.currentTimeMillis();
-//        learner.train(features, labels);
-//        double elapsedTime = System.currentTimeMillis() - startTime;
-//        System.out.println("Time to train (in seconds): " + elapsedTime / 1000.0);
-//        double accuracy = learner.measureAccuracy(features, labels, confusion);
-//        System.out.println("Training set accuracy: " + accuracy);
-//        if (printConfusionMatrix)
-//        {
-//            System.out.println("\nConfusion matrix: (Row=target value, Col=predicted value)");
-//            confusion.print();
-//            System.out.println("\n");
-//        }
+        TreeMap<Double, Integer> silhouetteScores = new TreeMap<>();
+        for (int i = 2; i < 20; i++)
+        {
+            learner.setK(i);
+            learner.run(data);
+            double averageSilhouetteScore = learner.averageSilhoutteScore();
+            System.out.println("Averages- K=" + i + " silhouette=" + averageSilhouetteScore);
+            silhouetteScores.put(averageSilhouetteScore, i);
+        }
+        silhouetteScores.remove(NaN);
+        System.out.println("Best score is " + silhouetteScores.lastKey() + " at K=" + silhouetteScores.lastEntry().getValue());
     }
 
     /**

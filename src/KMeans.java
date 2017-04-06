@@ -11,6 +11,8 @@ public class KMeans
     private DecimalFormat rounder;
     private Writer fileWriter;
 
+    private CentroidMap map;
+
     public KMeans(Random rand)
     {
         this.rand = rand;
@@ -35,7 +37,7 @@ public class KMeans
             nominals[i] = features.valueCount(i) != 0;
         }
 
-        CentroidMap map = new CentroidMap(k, features);
+        map = new CentroidMap(k, features);
         double lastIterationSSE = 0.0;
         boolean changing = true;
         while (changing)
@@ -60,11 +62,35 @@ public class KMeans
         }
         for (int i = 0; i < k; i++)
         {
-            System.out.println("Cluster " + i + ": Instances-" + map.centroidMembers.get(i).size() + "\tSSE-" + rounder.format(map.sumSquaredError(i)) + "\tMSE-" + rounder.format(map.meanSquaredError(i)));
+            System.out.println("Cluster " + i + "- Instances:" + map.centroidMembers.get(i).size() + "\tSSE:" + rounder.format(map.sumSquaredError(i)) +
+                    "\tMSE:" + rounder.format(map.meanSquaredError(i)) + "\tSilhouette:" + rounder.format(map.averageSilhouette(i)));
         }
         System.out.println("Total SSE: " + rounder.format(map.sumSquaredError()));
 
         fileWriter.close();
+    }
+
+    public TreeSet<Double> getSilhouetteScores()
+    {
+        TreeSet<Double> scores = new TreeSet<>();
+        for (int i = 0; i < k; i++)
+        {
+            scores.add(map.averageSilhouette(i));
+        }
+
+        return scores;
+    }
+
+    public double averageSilhoutteScore()
+    {
+        TreeSet<Double> scores = getSilhouetteScores();
+        double sum = 0.0;
+        for (double score : scores)
+        {
+            sum += score;
+        }
+
+        return sum / scores.size();
     }
 
     private double distance(double[] one, double[] two)
@@ -91,6 +117,11 @@ public class KMeans
         return Math.sqrt(sum);
     }
 
+    public void setK(int k)
+    {
+        this.k = k;
+    }
+
     private class CentroidMap
     {
         private int k;
@@ -99,7 +130,8 @@ public class KMeans
         private Matrix data;
         private HashMap<Integer, Integer> assignments;
         private ArrayList<TreeSet<Integer>> centroidMembers;
-        private ArrayList<ArrayList<Double>> distances;
+        private ArrayList<ArrayList<Double>> distancesToCentroids;
+        private double[][] distancesToNodes;
 
         private CentroidMap(int k, Matrix data)
         {
@@ -108,7 +140,7 @@ public class KMeans
             this.data = data;
             assignments = new HashMap<>();
             centroidMembers = new ArrayList<>();
-            distances = new ArrayList<>();
+            distancesToCentroids = new ArrayList<>();
 
 //            centroids = new double[this.k][];
 //            for (int i = 0; i < k; i++)
@@ -118,7 +150,7 @@ public class KMeans
             centroids = new double[this.k][];
             for (int i = 0; i < k; i++)
             {
-                int randomIndex = rand.nextInt() % data.rows();
+                int randomIndex = Math.abs(rand.nextInt() % data.rows());
                 centroids[i] = data.row(randomIndex).clone();
             }
 
@@ -126,9 +158,26 @@ public class KMeans
             {
                 centroidMembers.add(new TreeSet<>());
             }
+            distancesToNodes = new double[data.rows()][];
             for (int i = 0; i < data.rows(); i++)
             {
-                distances.add(new ArrayList<>());
+                distancesToCentroids.add(new ArrayList<>());
+                distancesToNodes[i] = new double[data.rows()];
+            }
+            for (int i = 0; i < data.rows(); i++)
+            {
+                for (int j = i; j < data.rows(); j++)
+                {
+                    if (j == i)
+                    {
+                        distancesToNodes[i][j] = 0;
+                        distancesToNodes[j][i] = 0;
+                        continue;
+                    }
+                    double distanceToNode = distance(data.row(i), data.row(j));
+                    distancesToNodes[i][j] = distanceToNode;
+                    distancesToNodes[j][i] = distanceToNode;
+                }
             }
         }
 
@@ -147,7 +196,7 @@ public class KMeans
                 for (int j = 0; j < centroids.length; j++)
                 {
                     double centroidDistance = distance(node, centroids[j]);
-                    distances.get(i).add(centroidDistance);
+                    distancesToCentroids.get(i).add(centroidDistance);
                     if (centroidDistance < closestDistance)
                     {
                         closestCentroid = j;
@@ -240,32 +289,6 @@ public class KMeans
 
             for (int i = 0; i < centroids.length; i++)
             {
-//                line.append("Centroid " + i + " =");
-//                for (int j = 0; j < data.cols(); j++)
-//                {
-//                    if (nominals[j])
-//                    {
-//                        if (centroids[i][j] == Double.MAX_VALUE)
-//                        {
-//                            line.append(" ?,");
-//                        }
-//                        else
-//                        {
-//                            line.append(" " + data.m_enum_to_str.get(j).get(((int) centroids[i][j])) + ",");
-//                        }
-//                    }
-//                    else
-//                    {
-//                        if (centroids[i][j] == Double.MAX_VALUE)
-//                        {
-//                            line.append(" ?,");
-//                        }
-//                        else
-//                        {
-//                            line.append(" " + rounder.format(centroids[i][j]) + ",");
-//                        }
-//                    }
-//                }
                 line.append(centroidInfo(i));
                 line.append("\n");
                 fileWriter.write(line.toString());
@@ -330,13 +353,8 @@ public class KMeans
                 assignments.put(node, centroid);
                 change = true;
             }
-            else
-            {
-//                assignments.put(node, centroid);
-            }
             centroidMembers.get(centroid).add(node);
 
-//            System.out.println("assign: " + change);
             return change;
         }
 
@@ -358,7 +376,7 @@ public class KMeans
             for (int member : members)
             {
                 int assignedTo = assignments.get(member);
-                sum += Math.pow(distances.get(member).get(assignedTo), 2);
+                sum += Math.pow(distancesToCentroids.get(member).get(assignedTo), 2);
             }
 
             return sum;
@@ -377,7 +395,56 @@ public class KMeans
         private void clear()
         {
             centroidMembers.forEach((TreeSet<Integer> element) -> element.clear());
-            distances.forEach((ArrayList<Double> element) -> element.clear());
+            distancesToCentroids.forEach((ArrayList<Double> element) -> element.clear());
+        }
+
+        private double averageSilhouette(int centroid)
+        {
+            TreeSet<Integer> members = centroidMembers.get(centroid);
+            double sum = 0.0;
+            for (int member : members)
+            {
+                sum += silhouette(member);
+            }
+
+            return sum / members.size();
+        }
+
+        private double silhouette(int node)
+        {
+            int myCentroid = assignments.get(node);
+            TreeSet<Integer> myCluster = centroidMembers.get(myCentroid);
+            double a = 0.0;
+            if (myCluster.size() != 1)
+            {
+                for (int member : myCluster)
+                {
+                    a += distancesToNodes[node][member];
+                }
+                a = a / (myCluster.size() - 1);
+            }
+            TreeSet<Double> bPossibles = new TreeSet<>();
+            double b;
+            for (int i = 0; i < k; i++)
+            {
+                if (i == myCentroid)
+                {
+                    continue;
+                }
+                TreeSet<Integer> thisCluster = centroidMembers.get(i);
+                b = 0.0;
+                for (int member : thisCluster)
+                {
+                    b += distancesToNodes[node][member];
+                }
+                b = b / thisCluster.size();
+                bPossibles.add(b);
+            }
+            b = bPossibles.first();
+
+            double result = (b - a)/Math.max(a,b);
+
+            return result;
         }
     }
 }
